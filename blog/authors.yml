@@ -1,0 +1,24 @@
+atripathi:
+  name: Abhishek Tripathi
+  title: Software Engineer
+  url: https://twitter.com/tripathi456
+  image_url: https://github.com/TwistingTwists.png
+  page: true
+  socials:
+    x: tripathi456
+    # linkedin: abhishektripathi
+    github: TwistingTwists
+
+ritesh:
+  name: Ritesh
+  title: Founder, Vertexcover
+  # url: https://sebastienlorber.com
+  # image_url: https://github.com/slorber.png
+  # page:
+  #   # customize the url of the author page at /blog/authors/<permalink>
+  #   permalink: '/all-sebastien-lorber-articles'
+  # socials:
+  #   x: sebastienlorber
+  #   linkedin: sebastienlorber
+  #   github: slorber
+  #   newsletter: https://thisweekinreact.com
