@@ -1,12 +1,11 @@
-atripathi:
+abeeshake:
   name: Abhishek Tripathi
-  title: Software Engineer
-  url: https://twitter.com/tripathi456
+  title: Curiosity brings awareness.
+  url: https://github.com/TwistingTwists
   image_url: https://github.com/TwistingTwists.png
   page: true
   socials:
-    x: tripathi456
-    # linkedin: abhishektripathi
+    x: twistin456
     github: TwistingTwists
 
 ritesh:

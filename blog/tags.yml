@@ -1,19 +1,9 @@
-facebook:
-  label: Facebook
-  permalink: /facebook
-  description: Facebook tag description
+end-to-end-testing:
+  label: End-to-End Test
+  permalink: /end-to-end-test
+  description: End-to-End Test
 
-hello:
-  label: Hello
-  permalink: /hello
-  description: Hello tag description
-
-docusaurus:
-  label: Docusaurus
-  permalink: /docusaurus
-  description: Docusaurus tag description
-
-hola:
-  label: Hola
-  permalink: /hola
-  description: Hola tag description
+ai-agents:
+  label: AI Agents
+  permalink: /ai-agents
+  description: AI Agents
