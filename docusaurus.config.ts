@@ -48,12 +48,10 @@ const config: Config = {
         //   // editUrl:
         //   //   'https://github.com/vertexcover-io/blogv2',
         // },
-
-        // todo enable gtag
-        // gtag: {
-        //   trackingID: 'G-B9R18KF2Y1',
-        //   anonymizeIP: false,
-        // },
+        gtag: {
+          trackingID: 'G-0JS91KNQLR',
+          anonymizeIP: false,
+        },
         blog: {
           routeBasePath: '/',
           showReadingTime: true,
