@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[472],{5513:e=>{e.exports=JSON.parse('{"title":"Recent posts","items":[{"title":"AI for End-to-End Tests (Mobile too!) with Auto Healing","permalink":"/blog/ai-agent-end-to-end-automated-tests-mobile","unlisted":false,"date":"2025-07-10T00:00:00.000Z"}]}')}}]);
