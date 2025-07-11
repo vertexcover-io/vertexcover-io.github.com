@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?><?xml-stylesheet type="text/xsl" href="atom.xsl"?>
 <feed xmlns="http://www.w3.org/2005/Atom">
-    <id>https://blog.vertexcover.io/</id>
+    <id>https://blog.vertexcover.io</id>
     <title>Blog - Vertexcover Blog</title>
     <updated>2025-07-10T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
-    <link rel="alternate" href="https://blog.vertexcover.io/"/>
+    <link rel="alternate" href="https://blog.vertexcover.io"/>
     <subtitle>Blog - Vertexcover Blog</subtitle>
     <icon>https://blog.vertexcover.io/img/favicon.ico</icon>
     <entry>
