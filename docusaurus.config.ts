@@ -75,9 +75,19 @@ const config: Config = {
     ],
   ],
 
+  headTags: [
+    {
+      tagName: 'meta',
+      attributes: {
+        name: 'generator',
+        content: 'vertex cover',
+      },
+    },
+  ],
+
   themeConfig: {
     // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: 'img/vertexcover.png',
     navbar: {
       title: 'Vertexcover',
       logo: {
