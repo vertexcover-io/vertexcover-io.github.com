@@ -9,6 +9,8 @@ image: /img/vertexcover.png
 
 import TLDR from '@site/src/components/TLDR';
 import QueueingTheoryGraph from '@site/src/components/QueueingTheoryGraph';
+import QueueWaitChart from '@site/src/components/QueueWaitChart';
+import MultiQueueSystem from '@site/src/components/MultiQueueSystem';
 
 ## Taming the Beast: How to Design a Queueing System for GPU-Intensive Workloads
 
@@ -37,16 +39,7 @@ In simple terms, queueing theory uses a few key variables:
 *   **Service Rate (μ - Mu):** How quickly a server can process tasks.
 *   **Utilization (ρ - Rho):** How busy a server is (λ/μ).
 
-<QueueingTheoryGraph />
-
-For a basic queue with one server (M/M/1), the average time a request spends in the system (waiting and being processed) is `W = 1/(μ - λ)`. As the arrival rate (λ) gets closer to the service rate (μ), utilization approaches 100%, and the waiting time (W) approaches infinity.
-
-Consider this:
-*   At 50% utilization, the average wait time is twice the actual processing time.
-*   At 80% utilization, it's 5 times the processing time.
-*   At 95% utilization, it's a staggering 20 times the processing time!
-
-This exponential increase means that trying to squeeze every last drop of performance out of your GPUs by keeping them at 95-100% utilization is a recipe for disaster. A tiny, unexpected spike in traffic can cause your wait times to explode, leading to system-wide slowdowns and unhappy users. The key is to design for a sustainable utilization level.
+<QueueWaitChart />
 
 ### The Architect's Solution: From One Big Line to a Multi-Lane Highway
 
@@ -61,6 +54,8 @@ This is the entry point for all requests. Built on elastic resources like CPUs, 
 **2. Multiple Priority Queues: Not All Videos Are Created Equal**
 
 Instead of one queue, we'll use at least three, each tailored to a specific customer segment. This can be implemented using robust message brokers like RabbitMQ or cloud services like AWS SQS.
+
+<MultiQueueSystem />
 
 *   **Queue 1: High-Priority / Real-Time (B2C Web & App Users):**
     *   **Goal:** Provide near-instantaneous processing for interactive users.
