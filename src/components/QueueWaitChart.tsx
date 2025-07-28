@@ -80,9 +80,9 @@ const QueueWaitChart: React.FC = () => {
 
       <div className="relative max-w-6xl mx-auto">
         {/* Main Chart Container */}
-        <div className="backdrop-blur-xl bg-white/40 rounded-3xl border border-white/30 shadow-2xl p-4 md:p-8 mb-6 md:mb-8 relative overflow-hidden">
+        <div className="backdrop-blur-xl bg-white bg-opacity-40 rounded-3xl border border-white border-opacity-30 shadow-2xl p-4 md:p-8 mb-6 md:mb-8 relative overflow-hidden">
           {/* Glass reflection effect */}
-          <div className="absolute inset-0 bg-gradient-to-tr from-white/30 via-transparent to-transparent opacity-50 rounded-3xl"></div>
+          <div className="absolute inset-0 bg-gradient-to-tr from-white opacity-30 via-transparent to-transparent opacity-50 rounded-3xl"></div>
           
           {/* Title */}
           <h1 className="text-2xl md:text-4xl font-bold text-gray-800 mb-6 md:mb-8 text-center relative z-10">
@@ -258,8 +258,8 @@ const QueueWaitChart: React.FC = () => {
         {/* Info Cards Row */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
           {/* Key Insight */}
-          <div className="lg:col-span-2 backdrop-blur-xl bg-white/40 rounded-2xl border border-white/30 shadow-xl p-4 md:p-6 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/20 via-transparent to-transparent opacity-30 rounded-2xl"></div>
+          <div className="lg:col-span-2 backdrop-blur-xl bg-white bg-opacity-40 rounded-2xl border border-white border-opacity-30 shadow-xl p-4 md:p-6 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-br from-white opacity-20 via-transparent to-transparent opacity-30 rounded-2xl"></div>
             <div className="relative z-10">
               <h3 className="text-lg md:text-xl font-bold text-gray-800 mb-4">Key Insight</h3>
               <p className="text-gray-700 mb-4 text-sm md:text-base">
@@ -274,7 +274,7 @@ const QueueWaitChart: React.FC = () => {
                   { level: '0.8 utilization', time: '5x wait time', color: 'bg-amber-500' },
                   { level: '0.95 utilization', time: '20x wait time', color: 'bg-red-500' }
                 ].map((item, index) => (
-                  <div key={index} className="flex items-center justify-between p-3 backdrop-blur-sm bg-white/30 rounded-lg border border-white/20">
+                  <div key={index} className="flex items-center justify-between p-3 backdrop-blur-sm bg-white bg-opacity-30 rounded-lg border border-white border-opacity-20">
                     <div className="flex items-center">
                       <div className={`w-3 h-3 rounded-full ${item.color} mr-3`}></div>
                       <span className="text-gray-800 text-sm md:text-base">{item.level}</span>
@@ -287,8 +287,8 @@ const QueueWaitChart: React.FC = () => {
           </div>
 
           {/* Design Rule */}
-          <div className="backdrop-blur-xl bg-white/40 rounded-2xl border border-white/30 shadow-xl p-4 md:p-6 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-tl from-blue-500/10 via-transparent to-transparent opacity-50 rounded-2xl"></div>
+          <div className="backdrop-blur-xl bg-white bg-opacity-40 rounded-2xl border border-white border-opacity-30 shadow-xl p-4 md:p-6 relative overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-tl from-blue-500 opacity-10 via-transparent to-transparent opacity-50 rounded-2xl"></div>
             <div className="relative z-10">
               <div className="flex items-center mb-4">
                 <div className="w-8 h-8 rounded-full bg-blue-500 flex items-center justify-center mr-3">

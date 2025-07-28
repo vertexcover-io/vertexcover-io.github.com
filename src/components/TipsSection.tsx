@@ -8,7 +8,7 @@ interface TipsSectionProps {
 
 const TipsSection: React.FC<TipsSectionProps> = ({ contributor, contributorUrl, children }) => {
   return (
-    <div className="relative bg-emerald-50/30 dark:bg-emerald-950/10 rounded-xl p-6 my-8 border-2 border-emerald-200 dark:border-emerald-800">
+    <div className="relative bg-emerald-50 bg-opacity-30 dark:bg-emerald-950 dark:bg-opacity-10 rounded-xl p-6 my-8 border-2 border-emerald-200 dark:border-emerald-800">
       {/* Decorative corner element */}
       <div className="absolute top-0 right-0 w-12 h-12 overflow-hidden">
         <div className="absolute top-0 right-0 w-0 h-0 border-l-12 border-b-12 border-l-transparent border-b-emerald-200 dark:border-b-emerald-800"></div>
@@ -16,7 +16,7 @@ const TipsSection: React.FC<TipsSectionProps> = ({ contributor, contributorUrl, 
       
       {/* Header with contributor info */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="flex-shrink-0 w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-full flex items-center justify-center">
+        <div className="flex-shrink-0 w-10 h-10 bg-emerald-100 dark:bg-emerald-900 dark:bg-opacity-30 rounded-full flex items-center justify-center">
           <svg 
             className="w-5 h-5 text-emerald-600 dark:text-emerald-400" 
             fill="none" 

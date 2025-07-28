@@ -150,39 +150,9 @@ Why? The overlapping windows create a "double token zone" during peak hours:
 **Result:** Between 9am-5pm = **double tokens available**
 
 
-<svg viewBox="0 0 800 200" xmlns="http://www.w3.org/2000/svg">
-  {/* <!-- Timeline --> */}
-  <line x1="50" y1="180" x2="750" y2="180" stroke="#e5e7eb" stroke-width="2"/>
-  
-  {/* <!-- Time labels --> */}
-  <text x="50" y="195" font-family="Arial" font-size="12" fill="#6b7280" text-anchor="middle">7am</text>
-  <text x="150" y="195" font-family="Arial" font-size="12" fill="#6b7280" text-anchor="middle">9am</text>
-  <text x="300" y="195" font-family="Arial" font-size="12" fill="#6b7280" text-anchor="middle">12pm</text>
-  <text x="400" y="195" font-family="Arial" font-size="12" fill="#6b7280" text-anchor="middle">2pm</text>
-  <text x="550" y="195" font-family="Arial" font-size="12" fill="#6b7280" text-anchor="middle">5pm</text>
-  <text x="650" y="195" font-family="Arial" font-size="12" fill="#6b7280" text-anchor="middle">7pm</text>
-  <text x="750" y="195" font-family="Arial" font-size="12" fill="#6b7280" text-anchor="middle">10pm</text>
-  
-  {/* <!-- Standard working day background - light background box --> */}
-  <rect x="150" y="25" width="500" height="140" fill="#10b981" opacity="0.1" rx="6"/>
-  
-  {/* <!-- Standard working day --> */}
-  <rect x="150" y="30" width="500" height="25" fill="#3b82f6" rx="4"/>
-  <text x="160" y="47" font-family="Arial" font-size="13" fill="white">Standard: 9am-7pm</text>
-  
-  {/* <!-- Token windows - all overlapping with the standard day background --> */}
-  <rect x="50" y="80" width="250" height="20" fill="#dc2626" rx="4"/>
-  <text x="60" y="93" font-family="Arial" font-size="12" fill="white">Window A: 7am-12pm</text>
-  
-  <rect x="300" y="110" width="250" height="20" fill="#8b5cf6" rx="4"/>
-  <text x="310" y="123" font-family="Arial" font-size="12" fill="white">Window B: 12pm-5pm</text>
-  
-  <rect x="550" y="140" width="200" height="20" fill="#06b6d4" rx="4"/>
-  <text x="560" y="153" font-family="Arial" font-size="12" fill="white">Window C: 5pm-10pm</text>
-  
-  {/* <!-- Title --> */}
-  <text x="400" y="20" font-family="Arial" font-size="14" fill="#10b981" text-anchor="middle" font-weight="bold">Double Tokens in Overlap Zones</text>
-</svg>
+
+<img src="/img/timeline.svg" />
+
 
 
 ### The CSV Strategy That Saved Hours
