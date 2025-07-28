@@ -81,10 +81,7 @@
             <name>Abhishek Tripathi</name>
             <uri>https://github.com/TwistingTwists</uri>
         </author>
-        <category label="ai" term="ai"/>
-        <category label="context-engineering" term="context-engineering"/>
-        <category label="claude-code" term="claude-code"/>
-        <category label="productivity" term="productivity"/>
+        <category label="Context Engineering" term="Context Engineering"/>
     </entry>
     <entry>
         <title type="html"><![CDATA[AI for End-to-End Tests (Mobile too!) with Auto Healing]]></title>
