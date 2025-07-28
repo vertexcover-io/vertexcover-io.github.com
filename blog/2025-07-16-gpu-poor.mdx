@@ -1,0 +1,87 @@
+---
+slug: ml-infra-for-the-gpu-poor
+title: ML Infra design for the GPU Poor
+description: ML Infra design for the GPU Poor
+date: 2025-07-16
+tags: [infra]
+image: /img/vertexcover.png
+draft: true
+---
+
+import TLDR from '@site/src/components/TLDR';
+import QueueingTheoryGraph from '@site/src/components/QueueingTheoryGraph';
+import QueueWaitChart from '@site/src/components/QueueWaitChart';
+import MultiQueueSystem from '@site/src/components/MultiQueueSystem';
+
+## Taming the Beast: How to Design a Queueing System for GPU-Intensive Workloads
+
+<TLDR>
+When designing for scale, the limiting factor is the GPU availability. So all rate limits / queueing must be designed around GPU availability.
+</TLDR> 
+
+**A guide for the aspiring software engineer on managing demand when your most critical resource is scarce.**
+
+Imagine you're building a revolutionary video generation service. Your platform is a hit, but you have a problem—a good problem, but a problem nonetheless. You have three types of customers, all knocking on your door at once:
+
+*   **B2C Customers:** Individuals using your web app to create short, fun videos. They expect results in seconds.
+*   **B2B Startups:** Small to medium-sized businesses using your API to generate a moderate volume of videos for their products.
+*   **B2B Giants:** Large enterprise clients who want to process massive workloads of tens of thousands of videos via your API.
+
+Here’s the catch: the heart of your operation, the GPU, is a fixed and expensive resource. Unlike CPU and memory, which are elastic and can be scaled on demand, your GPU capacity is limited. One B2B giant's request could monopolize your entire system, leaving your B2C users staring at a loading spinner for hours.
+
+How do you design a system that ingests all these requests, keeps every customer type happy, and doesn't crumble under the pressure of this GPU bottleneck? The answer lies in the mathematical study of waiting lines: **Queueing Theory**.
+
+### The Counter-Intuitive Truth About Being Busy
+
+Before we design our system, we must understand a fundamental insight from queueing theory: **wait times skyrocket as utilization exceeds 80%**.
+
+In simple terms, queueing theory uses a few key variables:
+*   **Arrival Rate (λ - Lambda):** How quickly tasks enter the queue.
+*   **Service Rate (μ - Mu):** How quickly a server can process tasks.
+*   **Utilization (ρ - Rho):** How busy a server is (λ/μ).
+
+<QueueWaitChart />
+
+### The Architect's Solution: From One Big Line to a Multi-Lane Highway
+
+A single "first-in, first-out" (FIFO) queue is clearly not going to work. The 50,000-video job from the B2B giant would create an unacceptable delay for everyone else. The solution is to create a multi-tiered system that can categorize, prioritize, and process requests based on the customer's needs and workload size.
+
+Here is a robust architectural approach:
+
+**1. The Ingestion Layer: The Always-Open Front Door**
+
+This is the entry point for all requests. Built on elastic resources like CPUs, its only job is to say "yes" as quickly as possible. It validates the request (e.g., checks the API key), and then, based on the customer type, immediately routes the job to the appropriate queue. This makes the system *feel* responsive to the user, even if their job isn't being processed instantly.
+
+**2. Multiple Priority Queues: Not All Videos Are Created Equal**
+
+Instead of one queue, we'll use at least three, each tailored to a specific customer segment. This can be implemented using robust message brokers like RabbitMQ or cloud services like AWS SQS.
+
+<MultiQueueSystem />
+
+*   **Queue 1: High-Priority / Real-Time (B2C Web & App Users):**
+    *   **Goal:** Provide near-instantaneous processing for interactive users.
+    *   **Mechanism:** This queue is serviced by a dedicated pool of GPUs or has strict priority, meaning workers will always pull from this queue if it has jobs. B2C workloads are typically small (one video at a time), so they can be processed quickly, providing the snappy user experience these customers expect.
+    *   **Trade-off:** Reserving GPU capacity for this queue means it might sit idle if there are no B2C users, which has a cost. However, this is often a necessary price for user satisfaction.
+
+*   **Queue 2: Medium-Priority / Standard API (B2B Small-to-Medium Scale):**
+    *   **Goal:** Offer reliable and predictable processing for moderate API users.
+    *   **Mechanism:** This is a standard FIFO queue for API-driven jobs that don't require immediate rendering. To prevent a single customer from dominating this queue, we must implement **rate limiting**. This ensures fair usage by controlling the number of requests a single tenant can make in a given time frame.
+
+*   **Queue 3: Low-Priority / Batch (B2B Large Scale):**
+    *   **Goal:** Maximize throughput and efficiency for giant workloads.
+    *   **Mechanism:** These massive jobs are sent to a batch processing queue. They are designed to run when there is spare GPU capacity, often during off-peak hours. These clients value eventual completion and cost-effectiveness over immediate results. To ensure fairness among large clients, the system can process jobs in a round-robin fashion (e.g., 100 videos from Client A, then 100 from Client B).
+
+**3. The Dispatcher & GPU Workers: The Brains and the Brawn**
+
+*   **The Dispatcher (Scheduler):** This service is the intelligent heart of the operation. It constantly polls the queues according to the priority rules: "Always check the high-priority queue first. If empty, check the medium. If empty, grab a job from the low-priority batch queue." It tracks which GPU workers are available and assigns them the next job.
+*   **The GPU Worker Fleet:** These are the workhorses. They are simple, dedicated servers that accept a job from the dispatcher, perform the video generation, and report back upon completion, ready for the next task. Keeping the processing pipeline entirely on the GPU, from decoding to inference, can further eliminate bottlenecks.
+
+### Advanced Considerations for a World-Class System
+
+*   **Providing Accurate ETAs:** Customers, especially API users, want to know when their job will be finished. While precise prediction is hard, you can provide a solid estimate. By using a variation of Little’s Law (`L = λW`), you can calculate the estimated wait time (`W`) by dividing the number of jobs ahead in the queue (`L`) by the service rate for that queue (number of GPUs assigned * processing speed).
+
+*   **Fairness in a Multi-Tenant System:** The "noisy neighbor" problem, where one high-usage tenant degrades performance for others, is a constant challenge. A multi-queue architecture is the first step. Further fairness can be achieved by sharding tenants across multiple queues or even creating a dedicated queue for each tenant, though this can increase management overhead.
+
+*   **The Power of Multiple Servers (M/M/c):** Queueing theory shows that having multiple servers is vastly more efficient than having a single server with the same total power. For our system, this means a fleet of `c` GPUs can handle a much higher workload and keep wait times significantly lower than one super-GPU. This justifies the "fleet" approach.
+
+By understanding the foundational principles of queueing theory and designing a system with intelligent, prioritized queues, you can build a video generation platform that remains responsive, fair, and scalable—even when your most valuable resource is in short supply.
