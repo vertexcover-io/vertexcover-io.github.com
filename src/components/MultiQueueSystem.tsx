@@ -10,9 +10,9 @@ const MultiQueueSystem: React.FC = () => {
   return (
     <div className="w-full my-6 flex justify-center">
       {/* Compact Table */}
-      <div className="backdrop-blur-sm bg-white/30 rounded-xl border border-gray-200 overflow-hidden">
+      <div className="backdrop-blur-sm bg-white bg-opacity-30 rounded-xl border border-gray-200 overflow-hidden">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50/50">
+          <thead className="bg-gray-50 bg-opacity-50">
             <tr className="border-b border-gray-200">
               <th className="text-left p-3 font-semibold text-gray-700">Queue</th>
               <th className="text-left p-3 font-semibold text-gray-700">Type</th>
@@ -25,7 +25,7 @@ const MultiQueueSystem: React.FC = () => {
           </thead>
           <tbody>
             {queues.map((q, i) => (
-              <tr key={i} className="border-b border-gray-100 hover:bg-white/20 transition-colors">
+              <tr key={i} className="border-b border-gray-100 hover:bg-white hover:bg-opacity-20 transition-colors">
                 <td className="p-3">
                   <div className="flex items-center">
                     <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: q.color }}></div>
@@ -54,7 +54,7 @@ const MultiQueueSystem: React.FC = () => {
         </table>
         
         {/* Processing Flow */}
-        <div className="bg-gray-50/30 p-3 border-t border-gray-200">
+        <div className="bg-gray-50 bg-opacity-30 p-3 border-t border-gray-200">
           <div className="flex items-center justify-center space-x-4 text-xs text-gray-600">
             <span>GPU Worker Priority:</span>
             {queues.map((q, i) => (
