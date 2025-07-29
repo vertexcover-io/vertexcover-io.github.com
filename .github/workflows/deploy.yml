@@ -28,7 +28,9 @@ jobs:
       - name: Build Docusaurus Site
         run: bun run build
 
-
+      - name: Copy CNAME # to ensure redirection keeps working
+        run: cp ./CNAME ./build/
+      
       # setup github user and email to github bot
       - uses: qoomon/actions--setup-git@v1
         with:
