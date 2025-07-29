@@ -1,0 +1,178 @@
+---
+slug: "strot-is-a-review-parser"
+title: "Strot - The Review Parser"
+date: 2025-07-28T00:00:00+00:00
+draft: false 
+---
+
+import ComparisonTable from '../src/components/ComparisonTable';
+import NumberedList from '../src/components/NumberedList';
+import TLDR from '../src/components/TLDR';
+import HierarchySection from '../src/components/HierarchySection';
+import SubSection from '../src/components/SubSection';
+
+
+This is a breakdown into what went into making Strot - The Review Parser. 
+
+<TLDR>
+Strot works in two steps:
+
+<NumberedList items={[
+  "Intercepts the right ajax calls from the website based on both visual analysis and via captured HAR logs",
+  "Uses those calls to fetch the reviews subsequently. So, getting top 100 reviews doesn't need to scrape the website AGAIN."
+]} />
+</TLDR>
+
+
+{/* truncate */}
+
+
+## What if ... ?
+
+When is comes to scraping reviews, things CAN BE slightly different than running playwright scripts. That's the idea we started with! 
+
+It stems from the insights on browsing shopify. Since, shopify has plugin ecosystem, a lot of reviews come from plugins. They give the reviews in html / json form via api that the page renders. 
+Since, reviews - if they are worthwhile - would be in 100s for a given product, it would be very unlikely that someone with good web-dev practices will send all of them on one shot. There MUST be a second call (pagination) that requests for further reviews for the given product. 
+
+What if ... we could scrape reviews via intercepting AJAX calls that are made from the browser? 
+
+
+## The Genesis 
+
+Hence, an experiement is born - called `strot`. In sanskrit it means source. We are trying to get to the ajax calls that gets us reviews. 
+
+The review scraping problem sits at a unique position. There are always MANY reviews which either causes cost ballooning no matter which existing approach you take. 
+
+<ComparisonTable 
+  data={[
+    {
+      feature: 'Cost',
+      playwright: { text: 'Infrastructure costs for automation', score: 'medium' },
+      llmScraper: { text: 'Pay per page + LLM inference', score: 'poor' },
+      strot: { text: 'One-time API discovery', score: 'good' }
+    },
+    {
+      feature: 'Speed',
+      playwright: { text: 'Slow - full page loads', score: 'poor' },
+      llmScraper: { text: 'Slow - LLM processing per page', score: 'poor' },
+      strot: { text: 'Fast - direct API calls', score: 'good' }
+    },
+    {
+      feature: 'Reliability',
+      playwright: { text: 'Breaks with UI changes', score: 'poor' },
+      llmScraper: { text: 'Depends on LLM accuracy', score: 'medium' },
+      strot: { text: 'Most reliable - uses actual APIs', score: 'good' }
+    },
+    {
+      feature: 'Scalability',
+      playwright: { text: 'Limited by browser resources', score: 'poor' },
+      llmScraper: { text: 'Limited by LLM rate limits', score: 'poor' },
+      strot: { text: 'Highly scalable - standard HTTP', score: 'good' }
+    },
+    {
+      feature: 'Maintenance',
+      playwright: { text: 'High - UI changes break scripts', score: 'poor' },
+      llmScraper: { text: 'Medium - prompt engineering needed', score: 'medium' },
+      strot: { text: 'Low - APIs rarely change', score: 'good' }
+    },
+    {
+      feature: 'Intelligence Required',
+      playwright: { text: 'High - manual scraper', score: 'poor' },
+      llmScraper: { text: 'High - per page analysis', score: 'poor' },
+      strot: { text: 'One-time - for API discovery', score: 'medium' }
+    },
+    {
+      feature: 'Volume Handling',
+      playwright: { text: 'Poor - loads full pages', score: 'poor' },
+      llmScraper: { text: 'Expensive - each page costs $', score: 'poor' },
+      strot: { text: 'Excellent - pagination via API', score: 'good' }
+    },
+    {
+      feature: 'Setup Complexity',
+      playwright: { text: 'Medium - browser automation', score: 'medium' },
+      llmScraper: { text: 'Low - plug and play', score: 'good' },
+      strot: { text: 'Low - plug and play', score: 'good' }
+    },
+    {
+      feature: 'Uniqueness',
+      playwright: { text: 'Common approach', score: 'poor' },
+      llmScraper: { text: 'Common approach', score: 'poor' },
+      strot: { text: 'Unique to us', score: 'good' }
+    }
+  ]}
+  columns={['playwright', 'llmScraper', 'strot']}
+  columnHeaders={['Playwright', 'LLM Scraper', 'Strot (Ours)']}
+/>
+
+So, IF we could find the ajax call → we only have to spend time figuring out the API call. and voila! You can simply call API - this is cheapest, fastest, most reliable approach of all. 
+
+And the unique to us. Hence, we took a bite. 
+
+But the challenge is which api call is most relevnt for scraping reviews ? 
+we solve this by capturing screenshot, visually analysing if review is preseng in the screenshot. Then we find a matching ajax call that has a similar content. Voila! 
+
+{/* <todo - insert screenshot for the ajazx call matching - either matches 90% or does not match at all > */}
+
+
+## The codegen 
+
+We internally represent all the relevant information as json. This helps us to generate http client in any language of choice. Calling this API endpoint in succession will give all the reviews.
+
+
+<HierarchySection title="Iteratively Improving via Error Analysis and Evals">
+
+Evals were central to us while building this. We had three tiered system for evals that served us well.
+
+<NumberedList items={[
+  "Does the analysis identify the right ajax call?",
+  "Is the pagination strategy detection done correctly?",
+  "Is the http api (codegen) able to get all the reviews?"
+]} />
+
+<SubSection title="Error Analysis">
+
+This was the most consuming element for us until we vibe-coded initial version of this dashboard to see the logs as data.
+
+Here is a quick peek over the dashboard we made to do the error analysis:
+
+This shows us the cost and token usage:
+<a href="/img/strot-dashboard-analysis.png" target="_blank" rel="noopener noreferrer">
+  <img src="/img/strot-dashboard-analysis.png" alt="Strot dashboard cost and token analysis" style={{cursor: 'pointer'}} />
+</a>
+
+This shows us the step by step observability into what is happening:
+<a href="/img/strot-dashboard-step.png" target="_blank" rel="noopener noreferrer">
+  <img src="/img/strot-dashboard-step.png" alt="Strot dashboard step by step analysis" style={{cursor: 'pointer'}} />
+</a>
+
+
+</SubSection>
+
+<SubSection title="Pagination">
+
+<a href="/img/strot-dashboard-pagination.png" target="_blank" rel="noopener noreferrer">
+  <img src="/img/strot-dashboard-pagination.png" alt="Strot dashboard pagination" style={{cursor: 'pointer'}} />
+</a>
+
+</SubSection>
+ 
+<SubSection title="Codegen">
+
+<a href="/img/strot-dashboard-codegen.png" target="_blank" rel="noopener noreferrer">
+  <img src="/img/strot-dashboard-codegen.png" alt="Strot dashboard codegen" style={{cursor: 'pointer'}} />
+</a>
+
+</SubSection>
+
+</HierarchySection>
+
+
+We are also learning. This was our attempt at scraping the webpage and using the visual understanding of image models to get to the reviews faster. if you feel this can be improved, feel free to share those with us on [github-issues](https://github.com/vertexcover-io/strot/issues).
+
+
+## Roadmap 
+
+<NumberedList items={[
+  "We are already on a path to make this a generic scraper. Currently, our evals sets show the tracking progress on various websites. It will be released soon.",
+  "if you would like us to host this as a service for you, we are more than happy to. Come chat with us at [contact email]"
+]} />
