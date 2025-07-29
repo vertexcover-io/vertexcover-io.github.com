@@ -170,7 +170,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Codeshelf, Inc. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Codeshelf, Inc.`,
     },
     prism: {
       theme: prismThemes.github,
