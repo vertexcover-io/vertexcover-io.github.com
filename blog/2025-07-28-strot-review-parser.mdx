@@ -56,15 +56,13 @@ Strot's architecture consists of three main components working in sequence:
 
 **2. Visual-Content Correlation Engine**
 - Takes screenshot of the page showing reviews
-- Uses vision models (GPT-4V/Claude-3) to extract review text from screenshots
+- Uses vision models (Claude-4-sonnet) to extract review text from screenshots
 - Performs fuzzy matching between screenshot content and API response data
-- Confidence scoring: 90%+ match = high confidence, 70-89% = medium, &lt;70% = reject
 
 **3. Pagination Strategy Detection**
 - Analyzes request parameters to identify pagination patterns
 - Common patterns: `page`, `offset`, `cursor`, `after`, `next_token`
 - Reverse engineers pagination logic from multiple API calls
-- Validates strategy by fetching multiple pages
 
 </DeepDive>
 
@@ -152,45 +150,18 @@ Our matching algorithm works in stages:
 
 <TechnicalCard type="performance" title="Why Screenshot Analysis vs Pure Network Analysis">
 
-**Screenshot Analysis Advantages:**
-- Confirms which API calls actually render user-visible content
+Since we have to do the hard part of finding the right AJAX call ONLY once, it means that we can use augmentation from vision understanding to make it more accurate. 
+
+This helps by:
+- Confirms which API calls actually render user-visible content. 
 - Handles cases where multiple API calls contain review data
 - Eliminates false positives from internal/admin API calls
-
-**Performance Trade-offs:**
-- Vision LLM calls add ~500ms latency
-- Screenshot processing: ~200ms
-- But eliminates manual verification saving hours per site
 
 </TechnicalCard>
 
 ## The challenges of current approaches 
 
 Each traditional approach faces fundamental limitations that compound at scale:
-
-<DeepDive title="Deep Analysis of Traditional Scraping Challenges">
-
-**Playwright/Selenium Approach:**
-- **Memory Bloat**: Each browser instance consumes 100-500MB RAM
-- **CPU Overhead**: Full page rendering, JS execution, image loading
-- **Anti-Bot Evolution**: Cloudflare, DataDome, PerimeterX constantly updating detection
-- **Maintenance Hell**: Selectors break with every UI update
-- **Rate Limiting**: Page load patterns easily detectable
-
-**LLM-Based Scraping:**
-- **Token Economics**: 4K tokens per page × $0.01 = expensive at scale
-- **Consistency Issues**: Model outputs vary, need verification layers
-- **Context Limitations**: Large pages exceed token limits, need chunking
-- **Latency**: 2-5 second response times vs millisecond API calls
-- **Hallucination Risk**: Models may invent review content
-
-**Traditional API Scraping:**
-- **Manual Reverse Engineering**: Hours per site to find endpoints
-- **Authentication Complexity**: CSRF tokens, session management, cookies
-- **Rate Limiting**: API-specific throttling rules
-- **Legal Gray Areas**: Terms of service violations
-
-</DeepDive>
 
 <TechnicalCard type="edge-case" title="The Review Volume Problem">
 
@@ -231,33 +202,11 @@ Our codegen system transforms discovered API patterns into production-ready code
 ```
 
 **2. Language-Specific Generation**
-- **Python**: Uses `requests` with retry logic, rate limiting
+- **Python**: Uses `requests`. Can use `rnet` if want to bypass TLS fingerprinting.
 - **Node.js**: `axios` with async/await patterns
 - **cURL**: Direct shell commands with proper escaping
-- **REST Clients**: Postman collections, Insomnia exports
-
-**3. Production Features**
-- Automatic retry with exponential backoff
-- Rate limiting (respects site's API limits)
-- Error handling for common failure modes
-- Request/response logging for debugging
 
 </DeepDive>
-
-<TechnicalCard type="implementation" title="Generated Code Structure">
-
-Each generated client includes:
-
-1. **Authentication Handling**: Automatic token refresh, session management
-2. **Pagination Logic**: Automatic iteration through all pages
-3. **Data Normalization**: Consistent review format across different sites
-4. **Error Recovery**: Network timeouts, rate limits, API changes
-5. **Caching Layer**: Avoid re-fetching identical data
-
-The generated code is production-ready, not just proof-of-concept scripts.
-
-</TechnicalCard>
-
 
 <HierarchySection title="Iteratively Improving via Error Analysis and Evals">
 
@@ -273,73 +222,42 @@ Evals were central to us while building this. We had three tiered system for eva
 
 Our evaluation system operates at three levels with automated scoring:
 
-**Level 1: AJAX Call Detection (Success Rate: 94.3%)**
-- **Ground Truth**: Manual verification of correct API endpoints
+**Level 1: AJAX Call Detection**
+- **Ground Truth**: Manual verification of correct API endpoints (part of **golden dataset** for evals)
 - **Automated Checks**:
   - Response contains review-like JSON structure (text, rating, author)
-  - Response size correlates with visible review count (±10% tolerance)
   - Content overlap with screenshot text >85%
-- **Failure Modes**: Dynamic endpoints, heavily obfuscated APIs, GraphQL mutations
 
-**Level 2: Pagination Strategy (Success Rate: 87.1%)**
-- **Test Suite**: 50 known pagination patterns across major e-commerce sites
+**Level 2: Pagination Strategy**
+- **Test Suite**: Tested pagination patterns (cursor, limit, offset) across major e-commerce sites
 - **Validation Logic**:
-  - Can we fetch pages 1, 2, 3 with different review sets?
   - Do we hit natural boundaries (page N returns empty/error)?
-  - Total review count matches sum of paginated responses
-- **Common Failures**: Cursor-based pagination (not offset), authentication expiry
 
-**Level 3: End-to-End Codegen (Success Rate: 89.7%)**
+**Level 3: End-to-End Codegen**
 - **Integration Tests**: Generated code fetches reviews from 10 test products
 - **Quality Metrics**:
   - Duplicate detection (same review across pages)
   - Data completeness (rating, text, date, author)
-  - Error handling (network failures, rate limits)
-- **Production Validation**: Customer usage data, error rates
 
 </DeepDive>
-
-<TechnicalCard type="performance" title="Evaluation Infrastructure Scale">
-
-Our eval pipeline processes:
-- **500+ websites** in regression testing
-- **10,000+ API endpoints** discovered and validated
-- **1M+ reviews** fetched daily for quality monitoring
-- **99.2% uptime** on evaluation infrastructure
-
-**Cost Optimization**: 
-- Cached screenshots (reduce vision API calls)
-- Parallel execution (30 sites simultaneously)
-- Incremental testing (only changed sites)
-
-</TechnicalCard>
 
 <SubSection title="Error Analysis">
 
 This was the most consuming element for us until we vibe-coded initial version of this dashboard to see the logs as data.
 
-<TechnicalCard type="implementation" title="Dashboard Architecture & Data Pipeline">
+<TechnicalCard type="implementation" title="Observability Dashboard">
 
-Our observability dashboard processes real-time data from:
+Our observability dashboard processes shows data from:
 
-**Data Sources:**
-- Application logs (structured JSON)
-- LLM API call traces (OpenAI/Anthropic)
-- Browser automation metrics (Playwright)
-- Generated code execution results
 
-**Real-time Processing:**
-- Event streaming via Apache Kafka
-- Stream processing with Apache Flink
-- Time-series data in InfluxDB
-- Dashboard built with React + D3.js
+<NumberedList items={[
+  "Application logs (structured JSON)",
+  "LLM API call traces (OpenAI/Anthropic)",
+  "Playwright screenshots"
+]} />
 
-**Key Metrics Tracked:**
-- Success rates by website domain
-- LLM token consumption per operation
-- Average processing time per site
-- Error categorization and trending
 
+This helps to do the error analysis and improve the system iteratively.
 </TechnicalCard>
 
 Here is a quick peek over the dashboard we made to do the error analysis:
@@ -385,60 +303,3 @@ We are also learning. This was our attempt at scraping the webpage and using the
   "We are already on a path to make this a generic scraper. Currently, our evals sets show the tracking progress on various websites. It will be released soon.",
   "if you would like us to host this as a service for you, we are more than happy to. Come chat with us at [contact email]"
 ]} />
-
-<DeepDive title="Technical Roadmap & Scaling Challenges">
-
-**Phase 1: Generic Content Scraping (Q2 2025)**
-- Extend beyond reviews to product data, prices, availability
-- Support for SPAs with dynamic loading (React, Vue, Angular)
-- GraphQL endpoint detection and mutation analysis
-- Multi-language content extraction (25+ languages)
-
-**Phase 2: Enterprise Features (Q3 2025)**
-- Real-time change detection and webhooks
-- Automatic schema evolution handling
-- Enterprise auth (SSO, RBAC, audit logs)
-- SLA guarantees (99.9% uptime, &lt;2s response time)
-
-**Phase 3: AI-Powered Enhancement (Q4 2025)**
-- Intelligent content classification (reviews vs comments vs descriptions)
-- Sentiment analysis pipeline for review scoring
-- Anomaly detection for data quality monitoring
-- Predictive modeling for API endpoint changes
-
-</DeepDive>
-
-<TechnicalCard type="architecture" title="Scaling Architecture Considerations">
-
-**Current Infrastructure:**
-- Supports 1,000 concurrent scraping jobs
-- Processes 50M+ API calls per month
-- 99.7% success rate across 500+ domains
-
-**Scaling Bottlenecks Identified:**
-- Vision LLM rate limits (addressing with local models)
-- Browser automation resource usage (moving to lightweight headless options)
-- Storage costs for HAR files (implementing intelligent retention policies)
-
-**Target: 10x Scale (Q4 2025)**
-- 10,000 concurrent jobs
-- 500M+ API calls per month
-- 99.9% success rate across 5,000+ domains
-
-</TechnicalCard>
-
-<TechnicalCard type="security" title="Security & Compliance Roadmap">
-
-**Data Privacy:**
-- Zero-log mode for sensitive data scraping
-- End-to-end encryption for generated API clients
-- GDPR compliance for EU customer data
-- SOC 2 Type II certification (in progress)
-
-**Ethical Scraping:**
-- Respect robots.txt and meta tags
-- Built-in rate limiting (configurable per domain)
-- User-agent transparency and contact info
-- Terms of service compliance checking
-
-</TechnicalCard>
