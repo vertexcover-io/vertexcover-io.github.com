@@ -1,0 +1,75 @@
+---
+slug: ml-infra-for-the-gpu-poor
+title: ML Infra design for the GPU Poor
+description: ML Infra design for the GPU Poor
+date: 2025-07-31
+tags: [infra]
+draft: false
+---
+
+import TLDR from '@site/src/components/TLDR';
+import QueueingTheoryGraph from '@site/src/components/QueueingTheoryGraph';
+import QueueWaitChart from '@site/src/components/QueueWaitChart';
+import MultiQueueSystem from '@site/src/components/MultiQueueSystem';
+import SmartScalingSimulator from '@site/src/components/SmartScalingSimulator';
+
+## Taming the Beast: How to Design a Queueing System for GPU-Intensive Workloads
+
+<TLDR>
+When designing for scale, the limiting factor is the GPU availability. So all rate limits / queueing must be designed around GPU availability.
+</TLDR> 
+
+**A guide for the aspiring software engineer on managing demand when your most critical resource is scarce.**
+
+Imagine you're building a revolutionary video generation service. Your platform is a hit, but you have a problem—a good problem, but a problem nonetheless. You have three types of customers, all knocking on your door at once:
+
+*   **B2C Customers:** Individuals using your web app to create short, fun videos. They expect results in seconds.
+*   **B2B Giants:** Large enterprise clients who want to process massive workloads of tens of thousands of videos via your API.
+
+Here’s the catch: the heart of your operation, the GPU, is a fixed and expensive resource. Unlike CPU and memory, which are elastic and can be scaled on demand, your GPU capacity is limited. One B2B giant's request could monopolize your entire system, leaving your B2C users staring at a loading spinner for hours.
+
+How do you design a system that ingests all these requests, keeps every customer type happy, and doesn't crumble under the pressure of this GPU bottleneck? The answer lies in the mathematical study of waiting lines: **Queueing Theory**.
+
+### The Counter-Intuitive Truth About Being Busy
+
+Before we design our system, we must understand a fundamental insight from queueing theory: **wait times skyrocket as utilization exceeds 80%**.
+
+In simple terms, queueing theory uses a few key variables:
+*   **Arrival Rate (λ - Lambda):** How quickly tasks enter the queue.
+*   **Service Rate (μ - Mu):** How quickly a server can process tasks.
+*   **Utilization (ρ - Rho):** How busy a server is (λ/μ).
+
+<QueueWaitChart />
+
+### The Architect's Solution: From One Big Line to a Multi-Lane Highway
+
+#### 1. The Foundational Shift: The "Video-Minute" as the True Unit of Work
+
+The system was re-architected around the concept of a "video-minute." Instead of measuring queue length by the number of jobs, it was measured by the total duration of all videos waiting to be processed. This immediately provided a far more accurate picture of the outstanding load on the GPU fleet.
+
+#### 2. Architecture: The Two-Lane Highway
+The core idea of separating UI and batch users was validated and implemented.
+Action: Two completely parallel infrastructures were created, each with its own dedicated queue and GPU fleet. This prevented any possibility of a "noisy neighbor" from the batch API world affecting the premium UI user experience. The UI queue was fed by a small, reserved pool of GPUs, while the batch queue was serviced by an auto-scaling fleet.
+
+
+#### 3. Smart Scaling: Beyond Simple Queue Length
+
+<SmartScalingSimulator />
+
+Yes, we should auto-scale the GPU, but how much? There are few places we can look for data to make informed choice.
+
+- Historical Learning: The scaling logic was made parametric to learn from historical provisioning times, helping it make smarter predictions about when to initiate scaling.
+- Metric-Driven Scaling: The auto-scaler was triggered based on "video-minutes".
+- Cold Start problem: There is 2-4 minute cold-start time for GPUs. So, provisioning a GPU only makes sense if the `video-minutes` to be processed are `X` times of cold start time. That way, frequent GPU provisioning does not lead inefficient compute. It's economically inefficient to provision a new GPU that takes 3 minutes to start, only to process a 2-minute video.
+
+#### 4. Predictability Through Pragmatism: Working backwards from limits
+
+The team acknowledged a hard truth: their ability to autoscale was not infinite. Based on historical data and cloud provider limits, they identified a realistic maximum number of GPUs they could reliably provision.
+The fixed maximum capacity (Max GPUs * video-minutes per GPU) became the system's total throughput budget. This budget was then divided among the maximum number of potential concurrent batch users.
+Result: This calculation yielded a crucial metric: the maximum video-minutes per minute that could be allocated to a single user. This became the foundation for providing realistic SLAs.
+
+#### 5. The SLAs: Per-Tenant Throttling and Dynamic ETAs
+
+This per-user capacity allocation was not just a theoretical number; it was enforced at the ingestion layer.
+Action: A user-aware rate limiter was placed at the front of the batch queue. If a user was allocated a capacity of "1 video-minute per minute", this gatekeeper would only release that amount of work from that user's batch into the main queue each minute.
+Accurate SLAs: This system allowed for incredibly predictable SLAs. If a user with a 1 video-minute/minute capacity submitted a batch of 100 jobs totaling 200 video-minutes, the system could confidently return an ETA of ~200 minutes plus a safety buffer, because it knew exactly how fast that user's jobs would be fed to the processors.

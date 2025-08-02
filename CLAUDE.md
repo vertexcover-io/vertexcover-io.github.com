@@ -1,6 +1,6 @@
 This is a typescript project. 
-- use `npm` as your python manager
-- use commands in package.json to run scripts
+- use `bun` as your package manager
+- ensure that after every change, `bun run build` does not show any error.
 
 ## working method
 

@@ -119,7 +119,8 @@ const config: Config = {
         //   position: 'left',
         //   label: 'Tutorial',
         // },
-        {to: '/', label: 'Blog', position: 'left'},
+        {to: '/', label: 'Blog', position: 'left', exact: true},
+        {to: '/projects', label: 'Projects', position: 'left'},
         {
           href: 'https://github.com/vertexcover-io',
           label: 'GitHub',
@@ -170,7 +171,7 @@ const config: Config = {
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} Codeshelf, Inc. Built with Docusaurus.`,
+      copyright: `Copyright © ${new Date().getFullYear()} Codeshelf, Inc.`,
     },
     prism: {
       theme: prismThemes.github,

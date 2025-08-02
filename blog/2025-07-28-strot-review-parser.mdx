@@ -10,6 +10,8 @@ import NumberedList from '../src/components/NumberedList';
 import TLDR from '../src/components/TLDR';
 import HierarchySection from '../src/components/HierarchySection';
 import SubSection from '../src/components/SubSection';
+import DeepDive from '../src/components/DeepDive';
+import TechnicalCard from '../src/components/TechnicalCard';
 
 
 This is a breakdown into what went into making Strot - The Review Parser. 
@@ -41,7 +43,41 @@ What if ... we could scrape reviews via intercepting AJAX calls that are made fr
 
 Hence, an experiement is born - called `strot`. In sanskrit it means source. We are trying to get to the ajax calls that gets us reviews. 
 
-The review scraping problem sits at a unique position. There are always MANY reviews which either causes cost ballooning no matter which existing approach you take. 
+The review scraping problem sits at a unique position. There are always MANY reviews which either causes cost ballooning no matter which existing approach you take.
+
+<DeepDive title="System Architecture & Technical Approach">
+
+Strot's architecture consists of three main components working in sequence:
+
+**1. HAR File Analysis Pipeline**
+- Captures network traffic using browser automation (Playwright/Puppeteer)
+- Filters AJAX/XHR requests that match review-related patterns
+- Builds a candidates list of potential review API endpoints
+
+**2. Visual-Content Correlation Engine**
+- Takes screenshot of the page showing reviews
+- Uses vision models (Claude-4-sonnet) to extract review text from screenshots
+- Performs fuzzy matching between screenshot content and API response data
+
+**3. Pagination Strategy Detection**
+- Analyzes request parameters to identify pagination patterns
+- Common patterns: `page`, `offset`, `cursor`, `after`, `next_token`
+- Reverse engineers pagination logic from multiple API calls
+
+</DeepDive>
+
+<TechnicalCard type="architecture" title="Why AJAX Interception vs DOM Scraping">
+
+Traditional DOM scraping faces several fundamental limitations:
+
+- **Rate Limiting**: Websites throttle based on page loads, not API calls
+- **Bot Detection**: Full page loads trigger anti-bot measures (Cloudflare, etc.)
+- **Resource Overhead**: Loading entire DOM + assets vs lightweight JSON responses
+- **Maintenance Burden**: CSS selectors break with UI changes, APIs rarely change
+
+AJAX interception bypasses these by operating at the data layer, not presentation layer.
+
+</TechnicalCard> 
 
 <ComparisonTable 
   data={[
@@ -50,24 +86,6 @@ The review scraping problem sits at a unique position. There are always MANY rev
       playwright: { text: 'Infrastructure costs for automation', score: 'medium' },
       llmScraper: { text: 'Pay per page + LLM inference', score: 'poor' },
       strot: { text: 'One-time API discovery', score: 'good' }
-    },
-    {
-      feature: 'Speed',
-      playwright: { text: 'Slow - full page loads', score: 'poor' },
-      llmScraper: { text: 'Slow - LLM processing per page', score: 'poor' },
-      strot: { text: 'Fast - direct API calls', score: 'good' }
-    },
-    {
-      feature: 'Reliability',
-      playwright: { text: 'Breaks with UI changes', score: 'poor' },
-      llmScraper: { text: 'Depends on LLM accuracy', score: 'medium' },
-      strot: { text: 'Most reliable - uses actual APIs', score: 'good' }
-    },
-    {
-      feature: 'Scalability',
-      playwright: { text: 'Limited by browser resources', score: 'poor' },
-      llmScraper: { text: 'Limited by LLM rate limits', score: 'poor' },
-      strot: { text: 'Highly scalable - standard HTTP', score: 'good' }
     },
     {
       feature: 'Maintenance',
@@ -82,7 +100,7 @@ The review scraping problem sits at a unique position. There are always MANY rev
       strot: { text: 'One-time - for API discovery', score: 'medium' }
     },
     {
-      feature: 'Volume Handling',
+      feature: 'Scalability',
       playwright: { text: 'Poor - loads full pages', score: 'poor' },
       llmScraper: { text: 'Expensive - each page costs $', score: 'poor' },
       strot: { text: 'Excellent - pagination via API', score: 'good' }
@@ -111,13 +129,84 @@ And the unique to us. Hence, we took a bite.
 But the challenge is which api call is most relevnt for scraping reviews ? 
 we solve this by capturing screenshot, visually analysing if review is preseng in the screenshot. Then we find a matching ajax call that has a similar content. Voila! 
 
-{/* <todo - insert screenshot for the ajazx call matching - either matches 90% or does not match at all > */}
+<TechnicalCard type="implementation" title="AJAX Call Matching Algorithm">
 
+Our matching algorithm works in stages:
+
+1. **Content Extraction**: Extract review text from screenshots using OCR + Vision LLM
+2. **API Response Analysis**: Parse all captured AJAX responses for text content
+3. **Fuzzy String Matching**: Use algorithms like Levenshtein distance, Jaccard similarity
+4. **Confidence Scoring**: 
+   - Text overlap ratio (>90% = high confidence)
+   - JSON structure analysis (nested objects, review-like fields)
+   - Response size correlation with visible review count
+
+**Edge Case Handling**: 
+- Paginated responses (partial matches expected)
+- Localized content (different languages)
+- Dynamic timestamps/IDs (filter out volatile fields)
+
+</TechnicalCard>
+
+<TechnicalCard type="performance" title="Why Screenshot Analysis vs Pure Network Analysis">
+
+Since we have to do the hard part of finding the right AJAX call ONLY once, it means that we can use augmentation from vision understanding to make it more accurate. 
+
+This helps by:
+- Confirms which API calls actually render user-visible content. 
+- Handles cases where multiple API calls contain review data
+- Eliminates false positives from internal/admin API calls
+
+</TechnicalCard>
+
+## The challenges of current approaches 
+
+Each traditional approach faces fundamental limitations that compound at scale:
+
+<TechnicalCard type="edge-case" title="The Review Volume Problem">
+
+Most products with worthwhile reviews have 100-10,000+ reviews. Traditional approaches cost:
+
+- **Playwright**: 100 reviews × 3 pages × 10s load time = 30+ minutes
+- **LLM Scraper**: 100 reviews × $0.10 per page = $10+ per product
+- **Manual API**: 100 reviews × 15min engineer time = $200+ per product
+
+Strot's approach: 100 reviews × 0.1s API call = 10 seconds total.
+
+</TechnicalCard>
 
 ## The codegen 
 
 We internally represent all the relevant information as json. This helps us to generate http client in any language of choice. Calling this API endpoint in succession will give all the reviews.
 
+<DeepDive title="Code Generation Pipeline & Implementation">
+
+Our codegen system transforms discovered API patterns into production-ready code:
+
+**1. API Pattern Extraction**
+```json
+{
+  "endpoint": "https://example.com/api/reviews",
+  "method": "POST",
+  "headers": {
+    "content-type": "application/json",
+    "x-requested-with": "XMLHttpRequest"
+  },
+  "pagination": {
+    "type": "offset",
+    "param": "offset",
+    "limit_param": "limit",
+    "max_per_request": 20
+  }
+}
+```
+
+**2. Language-Specific Generation**
+- **Python**: Uses `requests`. Can use `rnet` if want to bypass TLS fingerprinting.
+- **Node.js**: `axios` with async/await patterns
+- **cURL**: Direct shell commands with proper escaping
+
+</DeepDive>
 
 <HierarchySection title="Iteratively Improving via Error Analysis and Evals">
 
@@ -129,9 +218,47 @@ Evals were central to us while building this. We had three tiered system for eva
   "Is the http api (codegen) able to get all the reviews?"
 ]} />
 
+<DeepDive title="Comprehensive Evaluation System Architecture">
+
+Our evaluation system operates at three levels with automated scoring:
+
+**Level 1: AJAX Call Detection**
+- **Ground Truth**: Manual verification of correct API endpoints (part of **golden dataset** for evals)
+- **Automated Checks**:
+  - Response contains review-like JSON structure (text, rating, author)
+  - Content overlap with screenshot text >85%
+
+**Level 2: Pagination Strategy**
+- **Test Suite**: Tested pagination patterns (cursor, limit, offset) across major e-commerce sites
+- **Validation Logic**:
+  - Do we hit natural boundaries (page N returns empty/error)?
+
+**Level 3: End-to-End Codegen**
+- **Integration Tests**: Generated code fetches reviews from 10 test products
+- **Quality Metrics**:
+  - Duplicate detection (same review across pages)
+  - Data completeness (rating, text, date, author)
+
+</DeepDive>
+
 <SubSection title="Error Analysis">
 
 This was the most consuming element for us until we vibe-coded initial version of this dashboard to see the logs as data.
+
+<TechnicalCard type="implementation" title="Observability Dashboard">
+
+Our observability dashboard processes shows data from:
+
+
+<NumberedList items={[
+  "Application logs (structured JSON)",
+  "LLM API call traces (OpenAI/Anthropic)",
+  "Playwright screenshots"
+]} />
+
+
+This helps to do the error analysis and improve the system iteratively.
+</TechnicalCard>
 
 Here is a quick peek over the dashboard we made to do the error analysis:
 
