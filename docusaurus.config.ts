@@ -123,8 +123,9 @@ const config: Config = {
         {to: '/projects', label: 'Projects', position: 'left'},
         {
           href: 'https://github.com/vertexcover-io',
-          label: 'GitHub',
           position: 'right',
+          className: 'header-github-link',
+          'aria-label': 'GitHub repository',
         },
       ],
     },
@@ -167,6 +168,8 @@ const config: Config = {
             {
               label: 'GitHub',
               href: 'https://github.com/vertexcover-io',
+              className: 'footer-github-link',
+              'aria-label': 'GitHub repository',
             },
           ],
         },
