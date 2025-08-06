@@ -7,24 +7,79 @@ import { ProjectCard } from '../components/ProjectCard';
 
 # Projects
 
-Welcome to my collection of projects, experiments, and learning resources. From innovative review parsing systems to Claude Code optimization techniques, here's what I've been building and exploring.
 
-## Featured Projects
+## Open Source Tools
 
 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
   <ProjectCard
-    title="Strot - The Review Parser"
-    description="Revolutionary review scraping system that intercepts AJAX calls instead of DOM scraping, reducing costs by 90% and improving reliability."
+    title="CacheFlow"
+    description="Development-first Python caching library with specialized LLM support. Pure function decorators for async/sync compatibility with pluggable backends and intelligent cache key generation."
+    tags={["Python", "Caching", "LLM", "Async", "Decorators"]}
+    githubLink="https://github.com/vertexcover-io/cacheflow"
+    preview="Simplify caching for expensive computations and AI API calls"
+  />
+  
+  <ProjectCard
+    title="GateGPT"
+    description="Open source authentication solution for CustomGPT applications with Google OAuth integration, analytics dashboard, and extensible design for secure user access management."
+    tags={["FastAPI", "OAuth", "Authentication", "CustomGPT", "Analytics"]}
+    githubLink="https://github.com/vertexcover-io/gategpt"
+    preview="Secure and simplified authentication for CustomGPT applications"
+  />
+  
+  <ProjectCard
+    title="ethcloud"
+    description="CLI tool to launch, use and manage Ethereum clients on the cloud. Automates infrastructure provisioning, server hardening, and remote node management with support for AWS and Geth."
+    tags={["Python", "Ethereum", "CLI", "AWS", "Blockchain"]}
+    githubLink="https://github.com/kgritesh/ethcloud"
+    preview="Simplified cloud-based Ethereum node deployment and management"
+  />
+  
+  <ProjectCard
+    title="falcon-auth"
+    description="Falcon middleware with multiple authentication backends including Basic, Token, JWT, and Hawk authentication. Flexible per-resource configuration with route exemption support."
+    tags={["Python", "Falcon", "Authentication", "Middleware", "API Security"]}
+    githubLink="https://github.com/vertexcover-io/falcon-auth"
+    preview="Extensible authentication layer for Falcon web applications"
+  />
+  
+  <ProjectCard
+    title="postgresql-cdc"
+    description="Simple Go library for streaming PostgreSQL database changes over configurable streaming interfaces. Provides channel-based approach to capture and react to database modifications."
+    tags={["Go", "PostgreSQL", "CDC", "Streaming", "Database"]}
+    githubLink="https://github.com/vertexcover-io/postgresql-cdc"
+    preview="Stream PostgreSQL changes via configurable Go channels"
+  />
+  
+  <ProjectCard
+    title="Strot - The Ajax Scraper"
+    description="Revolutionary ajax scraping system that intercepts AJAX calls instead of DOM scraping, reducing costs by 90% and improving reliability."
     tags={["Python", "Playwright", "Computer Vision", "LLM", "Web Scraping"]}
-    demoLink="/strot-is-a-review-parser"
+    demoLink="/strot-is-a-ajax-scraper"
     githubLink="https://github.com/vertexcover-io/strot"
-    preview="Visual-content correlation engine with 94.3% success rate in API discovery"
+    preview="Ajax scraper for any website"
   />
 </div>
 
-## Tools & Utilities
+## Vibe Coded Apps
 
 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+  <ProjectCard
+    title="Grep App MCP Server"
+    description="Model Context Protocol server providing powerful code search capabilities across millions of GitHub repositories using grep.app API. Advanced filtering, batch retrieval, and comprehensive logging."
+    tags={["TypeScript", "MCP", "Code Search", "GitHub API", "Developer Tools"]}
+    githubLink="https://github.com/ai-tools-all/grep_app_mcp"
+    preview="Discover and research code implementations across open source projects"
+  />
+  
+  <ProjectCard
+    title="FastMCP Rust Documentation Server"
+    description="Manage and provide access to Rust crate documentation from docs.rs. Parses Cargo.lock files, fetches documentation, and serves it locally with HTML to Markdown conversion."
+    tags={["Python", "Rust", "Documentation", "Web Scraping", "MCP"]}
+    githubLink="https://github.com/ai-tools-all/rust_docs_mcp"
+    preview="Local Rust documentation server for your project dependencies"
+  />
+  
   <ProjectCard
     title="Claude Code Optimization Templates"
     description="Context engineering templates and workflows that transform Claude Code from assistant to autonomous teammate."
@@ -36,9 +91,26 @@ Welcome to my collection of projects, experiments, and learning resources. From 
 
 </div>
 
-## Blog Series & Deep Dives
+## Experiments
 
 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 my-8">
+  <ProjectCard
+    title="Insta Video Splitter"
+    description="React-powered browser app that splits videos into 15-second clips for Instagram Stories. Uses ffmpeg.js for client-side processing without requiring any backend services."
+    tags={["React", "Video Processing", "Instagram", "Browser App", "ffmpeg.js"]}
+    demoLink="https://insta-video-splitter.vertexcover.dev/"
+    githubLink="https://github.com/kgritesh/insta-vid-cutter"
+    preview="Split videos into Instagram Story-compatible clips entirely in browser"
+  />
+  
+  <ProjectCard
+    title="Consulting Calculator"
+    description="Interactive web application for calculating consulting rates, project costs, and time estimates. Helps freelancers and consultants with pricing strategies and project planning."
+    tags={["Web App", "Calculator", "Consulting", "Business Tools", "React"]}
+    demoLink="https://consulting-calculator.vertexcover.dev/"
+    preview="Calculate consulting rates and project costs with interactive tools"
+  />
+  
   <ProjectCard
     title="AI & Context Engineering"
     description="In-depth exploration of AI development workflows, Claude Code optimization, and context engineering techniques."
@@ -51,7 +123,7 @@ Welcome to my collection of projects, experiments, and learning resources. From 
     title="Web Scraping Innovation"
     description="Revolutionary approaches to web scraping using AJAX interception, computer vision, and LLM-powered content analysis."
     tags={["Web Scraping", "Computer Vision", "LLM", "Innovation"]}
-    demoLink="/strot-is-a-review-parser"
+    demoLink="/strot-is-a-ajax-scraper"
     preview="Technical deep-dive into next-generation scraping methodologies"
   />
 </div>
@@ -73,21 +145,5 @@ Welcome to my collection of projects, experiments, and learning resources. From 
     preview="Practical tools and techniques for improving development efficiency"
   />
 </div>
-
-## Open Source Contributions
-
-- **Strot Review Parser**: Open source web scraping innovation with AJAX interception
-- **Blog Components**: Reusable React components for technical content
-- **Claude Code Templates**: Context engineering templates for AI development
-- **Documentation**: Technical guides and best practices for developer productivity
-
-## Learning Resources
-
-- **Interactive Components**: All blog posts include interactive elements and code examples
-- **Technical Deep Dives**: Comprehensive analysis of complex technical topics
-- **Real-world Applications**: Practical implementations with production-ready code
-- **Open Source**: Everything is available for learning and contribution
-
----
 
 *Interested in collaborating or have questions about any of these projects? Feel free to [open an issue](https://github.com/vertexcover-io) or reach out through the blog!*

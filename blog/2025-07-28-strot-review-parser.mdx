@@ -1,6 +1,6 @@
 ---
-slug: "strot-is-a-review-parser"
-title: "Strot - The Review Parser"
+slug: "strot-is-a-ajax-scraper"
+title: "Strot - The Ajax Scraper"
 date: 2025-07-28T00:00:00+00:00
 draft: false 
 ---
@@ -14,10 +14,11 @@ import DeepDive from '../src/components/DeepDive';
 import TechnicalCard from '../src/components/TechnicalCard';
 
 
-This is a breakdown into what went into making Strot - The Review Parser. 
+Introduction to Strot - The Ajax Scraper.
+Any website that loads the data using ajax calls after the page load can be scraped using Strot. We show it's use case for reviews scraping below.
 
 <TLDR>
-Strot works in two steps:
+Strot (Sanskrit meaning source) works in two steps:
 
 <NumberedList items={[
   "Intercepts the right ajax calls from the website based on both visual analysis and via captured HAR logs",
@@ -41,7 +42,7 @@ What if ... we could scrape reviews via intercepting AJAX calls that are made fr
 
 ## The Genesis 
 
-Hence, an experiement is born - called `strot`. In sanskrit it means source. We are trying to get to the ajax calls that gets us reviews. 
+Hence, an experiment is born - called `strot`. In sanskrit it means source. We are trying to get to the ajax calls that gets us reviews. 
 
 The review scraping problem sits at a unique position. There are always MANY reviews which either causes cost ballooning no matter which existing approach you take.
 
@@ -65,6 +66,10 @@ Strot's architecture consists of three main components working in sequence:
 - Reverse engineers pagination logic from multiple API calls
 
 </DeepDive>
+
+Claims: 
+Strot is the only project which can scrape the data available as ajax call - at all - using natural language.
+
 
 <TechnicalCard type="architecture" title="Why AJAX Interception vs DOM Scraping">
 
