@@ -2,11 +2,78 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://blog.vertexcover.io</id>
     <title>Blog - Vertexcover Blog</title>
-    <updated>2025-07-31T00:00:00.000Z</updated>
+    <updated>2025-08-06T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://blog.vertexcover.io"/>
     <subtitle>Blog - Vertexcover Blog</subtitle>
     <icon>https://blog.vertexcover.io/img/favicon.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Video Rendering Pipeline for an AI-Driven Text-to-Video Platform]]></title>
+        <id>https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform</id>
+        <link href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform"/>
+        <updated>2025-08-06T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Video Rendering Pipeline for an AI-Driven Text-to-Video Platform]]></summary>
+        <content type="html"><![CDATA[<p>Replacing dual React-ffmpeg architecture with unified browser-based solution, achieving 100,000 daily video renders with consistent preview-output matching and halved development effort.</p>
+<!-- -->
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="context">Context<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#context" class="hash-link" aria-label="Direct link to Context" title="Direct link to Context">​</a></h2>
+<p>A leading AI company offers a cloud-based video editor, its core product, enabling users to effortlessly convert text into video with human avatars. The editor supports a wide range of features, from backgrounds, media integration, and text overlays to animations, transitions, fonts, styling, and scene management.</p>
+<p>Video generation operates as a pipeline: users begin by crafting a video using the browser-based tool, previewing their creation in real-time. Once satisfied, the video undergoes a render pipeline that culminates in the production of a full HD video, ensuring the final output mirrors the preview's fidelity. At its foundation, the frontend editor employs React, while the backend relies on a custom ffmpeg video renderer.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="problem">Problem<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#problem" class="hash-link" aria-label="Direct link to Problem" title="Direct link to Problem">​</a></h2>
+<p>The company's video editor relied on a dual system: a React-based preview in the browser and an ffmpeg-driven backend for final video rendering. This architecture presented multiple challenges:</p>
+<ul>
+<li>
+<p><strong>Complexity of ffmpeg</strong>: Using ffmpeg programmatically proved intricate due to its inherent complexities.</p>
+</li>
+<li>
+<p><strong>Mismatch Between Preview and Final Render</strong>: The separation of technologies (React for preview and ffmpeg for rendering) occasionally led to inconsistencies between the video preview and the final output.</p>
+</li>
+<li>
+<p><strong>Duplication of Effort</strong>: Introducing any new feature demanded double the effort: once for the preview in React and once more for the final render using ffmpeg. Moreover, ensuring consistency between these two stages added to the workload.</p>
+</li>
+<li>
+<p><strong>Limitations with ffmpeg</strong>: The use of ffmpeg imposed constraints on integrating advanced video editing features.</p>
+</li>
+</ul>
+<p>Furthermore, the ideal solution needed to meet specific criteria:</p>
+<ul>
+<li>Video generation time should align with the video's actual duration.</li>
+<li>The cost of rendering should not exceed 1Rs per minute of video.</li>
+<li>The solution should be feasible for relatively swift development and integration.</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="challenges-and-solution">Challenges and Solution<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#challenges-and-solution" class="hash-link" aria-label="Direct link to Challenges and Solution" title="Direct link to Challenges and Solution">​</a></h2>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="evaluating-browser-based-solutions">Evaluating Browser-Based Solutions<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#evaluating-browser-based-solutions" class="hash-link" aria-label="Direct link to Evaluating Browser-Based Solutions" title="Direct link to Evaluating Browser-Based Solutions">​</a></h3>
+<p>Drawing from my prior experience with video rendering pipelines, it was evident that a browser-centric solution could address our functional requirements. However, constraints related to cost and development time necessitated further exploration.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="library-exploration-for-time-efficiency">Library Exploration for Time-Efficiency<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#library-exploration-for-time-efficiency" class="hash-link" aria-label="Direct link to Library Exploration for Time-Efficiency" title="Direct link to Library Exploration for Time-Efficiency">​</a></h3>
+<p>An open-source library promising the conversion of React components to video emerged as a viable solution for rapid deployment. Preliminary experiments ensured its compatibility with our feature set. An in-depth examination of the library's source code was undertaken to gauge its maintainability, ease of potential forking, and readiness for production scenarios. Direct discussions with the library's author and the wider community bolstered our confidence in its capabilities.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="benchmarking-library-performance-on-lambda">Benchmarking Library Performance on Lambda<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#benchmarking-library-performance-on-lambda" class="hash-link" aria-label="Direct link to Benchmarking Library Performance on Lambda" title="Direct link to Benchmarking Library Performance on Lambda">​</a></h3>
+<p>The library was designed to operate on AWS Lambda. A series of benchmarks provided insights into its performance metrics, both in terms of rendering time and cost implications.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="cost-and-timing-optimization-with-prototype-benchmarking">Cost and Timing Optimization with Prototype Benchmarking<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#cost-and-timing-optimization-with-prototype-benchmarking" class="hash-link" aria-label="Direct link to Cost and Timing Optimization with Prototype Benchmarking" title="Direct link to Cost and Timing Optimization with Prototype Benchmarking">​</a></h3>
+<p>While the library met our immediate requirements, it presented cost-related challenges for the future, inherently rendering at a rate of 1fps. Recognizing this, I built a simplified clone of the open-source library to conduct focused benchmarking. The tests indicated that by leveraging the library's approach, we could achieve up to 4 FPS. The primary limitation was identified as the screenshot capture time, which took approximately 200ms per frame. This understanding offered clarity on the potential to optimize and align with the company's future cost and performance goals.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="addressing-the-vp8-format-bottleneck">Addressing the VP8 Format Bottleneck<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#addressing-the-vp8-format-bottleneck" class="hash-link" aria-label="Direct link to Addressing the VP8 Format Bottleneck" title="Direct link to Addressing the VP8 Format Bottleneck">​</a></h3>
+<p>The human avatar component of our rendering pipeline employed the VP8 video format for transparency support. While the chosen open-source platform accommodated VP8, it did so with suboptimal speeds. After experimenting with ffmpeg's WebAssembly version to disintegrate the video into frame sequences, we decided to restructure the text-to-video stage. Instead of producing videos, it was reconfigured to generate images directly, yielding twin advantages in performance and cost.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="custom-ffmpeg-integration">Custom ffmpeg Integration<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#custom-ffmpeg-integration" class="hash-link" aria-label="Direct link to Custom ffmpeg Integration" title="Direct link to Custom ffmpeg Integration">​</a></h3>
+<p>Our use case demanded specific ffmpeg flags and a customized ffmpeg version – elements not supported natively by the library. To bridge this gap, I employed pnpm patching and automated the building of a custom ffmpeg version from its source.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="code-reusability-for-consistency">Code Reusability for Consistency<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#code-reusability-for-consistency" class="hash-link" aria-label="Direct link to Code Reusability for Consistency" title="Direct link to Code Reusability for Consistency">​</a></h3>
+<p>A design approach was adopted where the developed code functioned as a reusable library. This allowed its integration into both the frontend for previews and the backend for final video rendering, ensuring uniformity across stages.</p>
+<h3 class="anchor anchorWithStickyNavbar_LWe7" id="animation-and-transition-integration">Animation and Transition Integration<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#animation-and-transition-integration" class="hash-link" aria-label="Direct link to Animation and Transition Integration" title="Direct link to Animation and Transition Integration">​</a></h3>
+<p>The final development phase involved the addition of animation and scene transition capabilities to the platform.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="impact">Impact<a href="https://blog.vertexcover.io/video-rendering-pipeline-for-an-ai-driven-text-to-video-platform#impact" class="hash-link" aria-label="Direct link to Impact" title="Direct link to Impact">​</a></h2>
+<ul>
+<li>
+<p><strong>Stable Production Implementation</strong>: The solution has been integrated into production and operates with minimal disruptions. It is written in 100% typescript with ~90% test coverage.</p>
+</li>
+<li>
+<p><strong>Consistent Previews and Renders</strong>: The disparity between previews and final video renders, previously a pain point, has been eradicated, ensuring consistent user expectations.</p>
+</li>
+<li>
+<p><strong>Swift Feature Integration</strong>: The new system facilitated the rapid introduction of enhancements like custom fonts, animations, and scene transitions, effectively halving the time and effort previously required for such additions.</p>
+</li>
+<li>
+<p><strong>Seamless Scaling</strong>: With the implemented improvements, the platform now comfortably handles the rendering of up to 100,000 videos daily without necessitating additional adjustments or overhead.</p>
+</li>
+</ul>]]></content>
+        <category label="infra" term="infra"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[ML Infra design for the GPU Poor]]></title>
         <id>https://blog.vertexcover.io/ml-infra-for-the-gpu-poor</id>
@@ -57,21 +124,22 @@ Accurate SLAs: This system allowed for incredibly predictable SLAs. If a user wi
         <category label="infra" term="infra"/>
     </entry>
     <entry>
-        <title type="html"><![CDATA[Strot - The Review Parser]]></title>
-        <id>https://blog.vertexcover.io/strot-is-a-review-parser</id>
-        <link href="https://blog.vertexcover.io/strot-is-a-review-parser"/>
+        <title type="html"><![CDATA[Strot - The Ajax Scraper]]></title>
+        <id>https://blog.vertexcover.io/strot-is-a-ajax-scraper</id>
+        <link href="https://blog.vertexcover.io/strot-is-a-ajax-scraper"/>
         <updated>2025-07-28T00:00:00.000Z</updated>
-        <summary type="html"><![CDATA[This is a breakdown into what went into making Strot - The Review Parser.]]></summary>
-        <content type="html"><![CDATA[<p>This is a breakdown into what went into making Strot - The Review Parser.</p>
-<div style="background-color:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:16px;margin:20px 0;border-left:4px solid #007bff"><strong style="color:#007bff;font-size:14px;text-transform:uppercase;letter-spacing:0.5px">TL;DR:</strong><div style="margin-top:8px"><p>Strot works in two steps:</p><ol style="padding-left:20px;margin:16px 0;line-height:1.6;list-style:decimal;list-style-type:decimal;list-style-position:outside" start="1"><li style="margin-bottom:8px;padding-left:8px;display:list-item">Intercepts the right ajax calls from the website based on both visual analysis and via captured HAR logs</li><li style="margin-bottom:8px;padding-left:8px;display:list-item">Uses those calls to fetch the reviews subsequently. So, getting top 100 reviews doesn't need to scrape the website AGAIN.</li></ol></div></div>
+        <summary type="html"><![CDATA[Introduction to Strot - The Ajax Scraper.]]></summary>
+        <content type="html"><![CDATA[<p>Introduction to Strot - The Ajax Scraper.
+Any website that loads the data using ajax calls after the page load can be scraped using Strot. We show it's use case for reviews scraping below.</p>
+<div style="background-color:#f8f9fa;border:1px solid #dee2e6;border-radius:8px;padding:16px;margin:20px 0;border-left:4px solid #007bff"><strong style="color:#007bff;font-size:14px;text-transform:uppercase;letter-spacing:0.5px">TL;DR:</strong><div style="margin-top:8px"><p>Strot (Sanskrit meaning source) works in two steps:</p><ol style="padding-left:20px;margin:16px 0;line-height:1.6;list-style:decimal;list-style-type:decimal;list-style-position:outside" start="1"><li style="margin-bottom:8px;padding-left:8px;display:list-item">Intercepts the right ajax calls from the website based on both visual analysis and via captured HAR logs</li><li style="margin-bottom:8px;padding-left:8px;display:list-item">Uses those calls to fetch the reviews subsequently. So, getting top 100 reviews doesn't need to scrape the website AGAIN.</li></ol></div></div>
 <!-- -->
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-if--">What if ... ?<a href="https://blog.vertexcover.io/strot-is-a-review-parser#what-if--" class="hash-link" aria-label="Direct link to What if ... ?" title="Direct link to What if ... ?">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-if--">What if ... ?<a href="https://blog.vertexcover.io/strot-is-a-ajax-scraper#what-if--" class="hash-link" aria-label="Direct link to What if ... ?" title="Direct link to What if ... ?">​</a></h2>
 <p>When is comes to scraping reviews, things CAN BE slightly different than running playwright scripts. That's the idea we started with!</p>
 <p>It stems from the insights on browsing shopify. Since, shopify has plugin ecosystem, a lot of reviews come from plugins. They give the reviews in html / json form via api that the page renders.
 Since, reviews - if they are worthwhile - would be in 100s for a given product, it would be very unlikely that someone with good web-dev practices will send all of them on one shot. There MUST be a second call (pagination) that requests for further reviews for the given product.</p>
 <p>What if ... we could scrape reviews via intercepting AJAX calls that are made from the browser?</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-genesis">The Genesis<a href="https://blog.vertexcover.io/strot-is-a-review-parser#the-genesis" class="hash-link" aria-label="Direct link to The Genesis" title="Direct link to The Genesis">​</a></h2>
-<p>Hence, an experiement is born - called <code>strot</code>. In sanskrit it means source. We are trying to get to the ajax calls that gets us reviews.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-genesis">The Genesis<a href="https://blog.vertexcover.io/strot-is-a-ajax-scraper#the-genesis" class="hash-link" aria-label="Direct link to The Genesis" title="Direct link to The Genesis">​</a></h2>
+<p>Hence, an experiment is born - called <code>strot</code>. In sanskrit it means source. We are trying to get to the ajax calls that gets us reviews.</p>
 <p>The review scraping problem sits at a unique position. There are always MANY reviews which either causes cost ballooning no matter which existing approach you take.</p>
 <div style="background-color:var(--ifm-background-surface-color, #ffffff);border:1px solid var(--ifm-color-emphasis-300, #d0d7de);border-radius:12px;margin:20px 0;overflow:hidden;box-shadow:0 2px 8px rgba(0, 0, 0, 0.06);transition:all 0.2s ease-in-out"><div style="background-color:var(--ifm-color-emphasis-100, #f6f8fa);padding:16px 20px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:none;transition:background-color 0.2s ease-in-out;user-select:none"><div style="display:flex;align-items:center"><span style="font-size:1.2rem;margin-right:8px">🔍</span><strong style="color:var(--ifm-color-primary, #2e8555);font-size:1.1rem;font-weight:600">Deep Dive: <!-- -->System Architecture &amp; Technical Approach</strong></div><div style="transform:rotate(0deg);transition:transform 0.2s ease-in-out;font-size:1.2rem;color:var(--ifm-color-emphasis-600, #656d76)">▼</div></div><style>
           @keyframes fadeIn {
@@ -79,6 +147,8 @@ Since, reviews - if they are worthwhile - would be in 100s for a given product, 
             to { opacity: 1; transform: translateY(0); }
           }
         </style></div>
+<p>Claims:
+Strot is the only project which can scrape the data available as ajax call - at all - using natural language.</p>
 <div style="background-color:rgba(26, 127, 55, 0.1);border:1px solid rgba(26, 127, 55, 0.3);border-radius:8px;padding:16px 20px;margin:16px 0;border-left:4px solid #1a7f37;position:relative;transition:all 0.2s ease-in-out"><div style="display:flex;align-items:center;margin-bottom:12px"><span style="font-size:1.1rem;margin-right:8px">🏗️</span><strong style="color:#1a7f37;font-size:1rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Architecture Detail<!-- -->: <!-- -->Why AJAX Interception vs DOM Scraping</strong></div><div style="font-size:1rem;line-height:1.6;color:var(--ifm-color-content, #1c1e21)"><p>Traditional DOM scraping faces several fundamental limitations:</p><ul>
 <li><strong>Rate Limiting</strong>: Websites throttle based on page loads, not API calls</li>
 <li><strong>Bot Detection</strong>: Full page loads trigger anti-bot measures (Cloudflare, etc.)</li>
@@ -111,14 +181,14 @@ we solve this by capturing screenshot, visually analysing if review is preseng i
 <li>Handles cases where multiple API calls contain review data</li>
 <li>Eliminates false positives from internal/admin API calls</li>
 </ul></div></div>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-challenges-of-current-approaches">The challenges of current approaches<a href="https://blog.vertexcover.io/strot-is-a-review-parser#the-challenges-of-current-approaches" class="hash-link" aria-label="Direct link to The challenges of current approaches" title="Direct link to The challenges of current approaches">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-challenges-of-current-approaches">The challenges of current approaches<a href="https://blog.vertexcover.io/strot-is-a-ajax-scraper#the-challenges-of-current-approaches" class="hash-link" aria-label="Direct link to The challenges of current approaches" title="Direct link to The challenges of current approaches">​</a></h2>
 <p>Each traditional approach faces fundamental limitations that compound at scale:</p>
 <div style="background-color:rgba(207, 34, 46, 0.1);border:1px solid rgba(207, 34, 46, 0.3);border-radius:8px;padding:16px 20px;margin:16px 0;border-left:4px solid #cf222e;position:relative;transition:all 0.2s ease-in-out"><div style="display:flex;align-items:center;margin-bottom:12px"><span style="font-size:1.1rem;margin-right:8px">🐛</span><strong style="color:#cf222e;font-size:1rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Edge Case<!-- -->: <!-- -->The Review Volume Problem</strong></div><div style="font-size:1rem;line-height:1.6;color:var(--ifm-color-content, #1c1e21)"><p>Most products with worthwhile reviews have 100-10,000+ reviews. Traditional approaches cost:</p><ul>
 <li><strong>Playwright</strong>: 100 reviews × 3 pages × 10s load time = 30+ minutes</li>
 <li><strong>LLM Scraper</strong>: 100 reviews × $0.10 per page = $10+ per product</li>
 <li><strong>Manual API</strong>: 100 reviews × 15min engineer time = $200+ per product</li>
 </ul><p>Strot's approach: 100 reviews × 0.1s API call = 10 seconds total.</p></div></div>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-codegen">The codegen<a href="https://blog.vertexcover.io/strot-is-a-review-parser#the-codegen" class="hash-link" aria-label="Direct link to The codegen" title="Direct link to The codegen">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="the-codegen">The codegen<a href="https://blog.vertexcover.io/strot-is-a-ajax-scraper#the-codegen" class="hash-link" aria-label="Direct link to The codegen" title="Direct link to The codegen">​</a></h2>
 <p>We internally represent all the relevant information as json. This helps us to generate http client in any language of choice. Calling this API endpoint in succession will give all the reviews.</p>
 <div style="background-color:var(--ifm-background-surface-color, #ffffff);border:1px solid var(--ifm-color-emphasis-300, #d0d7de);border-radius:12px;margin:20px 0;overflow:hidden;box-shadow:0 2px 8px rgba(0, 0, 0, 0.06);transition:all 0.2s ease-in-out"><div style="background-color:var(--ifm-color-emphasis-100, #f6f8fa);padding:16px 20px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;border-bottom:none;transition:background-color 0.2s ease-in-out;user-select:none"><div style="display:flex;align-items:center"><span style="font-size:1.2rem;margin-right:8px">🔍</span><strong style="color:var(--ifm-color-primary, #2e8555);font-size:1.1rem;font-weight:600">Deep Dive: <!-- -->Code Generation Pipeline &amp; Implementation</strong></div><div style="transform:rotate(0deg);transition:transform 0.2s ease-in-out;font-size:1.2rem;color:var(--ifm-color-emphasis-600, #656d76)">▼</div></div><style>
           @keyframes fadeIn {
@@ -133,7 +203,7 @@ we solve this by capturing screenshot, visually analysing if review is preseng i
           }
         </style></div><div style="margin-bottom:32px;background:var(--ifm-background-surface-color, #ffffff);border-radius:12px;padding:24px;border:1px solid var(--ifm-color-emphasis-200, #e3e5e7);box-shadow:0 2px 8px rgba(0, 0, 0, 0.04);transition:all 0.2s ease-in-out"><h4 style="font-size:1.3rem;font-weight:700;margin-bottom:16px;color:var(--ifm-color-primary, #2e8555)">Error Analysis</h4><div style="font-size:1rem;line-height:1.7"><p>This was the most consuming element for us until we vibe-coded initial version of this dashboard to see the logs as data.</p><div style="background-color:rgba(9, 105, 218, 0.1);border:1px solid rgba(9, 105, 218, 0.3);border-radius:8px;padding:16px 20px;margin:16px 0;border-left:4px solid #0969da;position:relative;transition:all 0.2s ease-in-out"><div style="display:flex;align-items:center;margin-bottom:12px"><span style="font-size:1.1rem;margin-right:8px">💾</span><strong style="color:#0969da;font-size:1rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Implementation Note<!-- -->: <!-- -->Observability Dashboard</strong></div><div style="font-size:1rem;line-height:1.6;color:var(--ifm-color-content, #1c1e21)"><p>Our observability dashboard processes shows data from:</p><ol style="padding-left:20px;margin:16px 0;line-height:1.6;list-style:decimal;list-style-type:decimal;list-style-position:outside" start="1"><li style="margin-bottom:8px;padding-left:8px;display:list-item">Application logs (structured JSON)</li><li style="margin-bottom:8px;padding-left:8px;display:list-item">LLM API call traces (OpenAI/Anthropic)</li><li style="margin-bottom:8px;padding-left:8px;display:list-item">Playwright screenshots</li></ol><p>This helps to do the error analysis and improve the system iteratively.</p></div></div><p>Here is a quick peek over the dashboard we made to do the error analysis:</p><p>This shows us the cost and token usage:</p><a href="https://blog.vertexcover.io/img/strot-dashboard-analysis.png" target="_blank" rel="noopener noreferrer"><img src="https://blog.vertexcover.io/img/strot-dashboard-analysis.png" alt="Strot dashboard cost and token analysis" style="cursor:pointer"></a><p>This shows us the step by step observability into what is happening:</p><a href="https://blog.vertexcover.io/img/strot-dashboard-step.png" target="_blank" rel="noopener noreferrer"><img src="https://blog.vertexcover.io/img/strot-dashboard-step.png" alt="Strot dashboard step by step analysis" style="cursor:pointer"></a></div></div><div style="margin-bottom:32px;background:var(--ifm-background-surface-color, #ffffff);border-radius:12px;padding:24px;border:1px solid var(--ifm-color-emphasis-200, #e3e5e7);box-shadow:0 2px 8px rgba(0, 0, 0, 0.04);transition:all 0.2s ease-in-out"><h4 style="font-size:1.3rem;font-weight:700;margin-bottom:16px;color:var(--ifm-color-primary, #2e8555)">Pagination</h4><div style="font-size:1rem;line-height:1.7"><a href="https://blog.vertexcover.io/img/strot-dashboard-pagination.png" target="_blank" rel="noopener noreferrer"><img src="https://blog.vertexcover.io/img/strot-dashboard-pagination.png" alt="Strot dashboard pagination" style="cursor:pointer"></a></div></div><div style="margin-bottom:32px;background:var(--ifm-background-surface-color, #ffffff);border-radius:12px;padding:24px;border:1px solid var(--ifm-color-emphasis-200, #e3e5e7);box-shadow:0 2px 8px rgba(0, 0, 0, 0.04);transition:all 0.2s ease-in-out"><h4 style="font-size:1.3rem;font-weight:700;margin-bottom:16px;color:var(--ifm-color-primary, #2e8555)">Codegen</h4><div style="font-size:1rem;line-height:1.7"><a href="https://blog.vertexcover.io/img/strot-dashboard-codegen.png" target="_blank" rel="noopener noreferrer"><img src="https://blog.vertexcover.io/img/strot-dashboard-codegen.png" alt="Strot dashboard codegen" style="cursor:pointer"></a></div></div></div></div>
 <p>We are also learning. This was our attempt at scraping the webpage and using the visual understanding of image models to get to the reviews faster. if you feel this can be improved, feel free to share those with us on <a href="https://github.com/vertexcover-io/strot/issues" target="_blank" rel="noopener noreferrer">github-issues</a>.</p>
-<h2 class="anchor anchorWithStickyNavbar_LWe7" id="roadmap">Roadmap<a href="https://blog.vertexcover.io/strot-is-a-review-parser#roadmap" class="hash-link" aria-label="Direct link to Roadmap" title="Direct link to Roadmap">​</a></h2>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="roadmap">Roadmap<a href="https://blog.vertexcover.io/strot-is-a-ajax-scraper#roadmap" class="hash-link" aria-label="Direct link to Roadmap" title="Direct link to Roadmap">​</a></h2>
 <ol style="padding-left:20px;margin:16px 0;line-height:1.6;list-style:decimal;list-style-type:decimal;list-style-position:outside" start="1"><li style="margin-bottom:8px;padding-left:8px;display:list-item">We are already on a path to make this a generic scraper. Currently, our evals sets show the tracking progress on various websites. It will be released soon.</li><li style="margin-bottom:8px;padding-left:8px;display:list-item">if you would like us to host this as a service for you, we are more than happy to. Come chat with us at [contact email]</li></ol>]]></content>
     </entry>
     <entry>
