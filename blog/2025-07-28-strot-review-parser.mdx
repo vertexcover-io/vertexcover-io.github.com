@@ -1,6 +1,6 @@
 ---
-slug: "strot-is-a-ajax-scraper"
-title: "Strot - The Ajax Scraper"
+slug: "strot-is-a-api-scraper"
+title: "Strot - The API Scraper"
 date: 2025-07-28T00:00:00+00:00
 draft: false 
 ---
@@ -12,77 +12,46 @@ import HierarchySection from '../src/components/HierarchySection';
 import SubSection from '../src/components/SubSection';
 import DeepDive from '../src/components/DeepDive';
 import TechnicalCard from '../src/components/TechnicalCard';
+import YouTubeEmbed from '../src/components/YouTubeEmbed';
 
-
-Introduction to Strot - The Ajax Scraper.
-Any website that loads the data using ajax calls after the page load can be scraped using Strot. We show it's use case for reviews scraping below.
 
 <TLDR>
-Strot (Sanskrit meaning source) works in two steps:
+Strot (Sanskrit meaning source) is an AI agent which scrapes web api:
 
 <NumberedList items={[
-  "Intercepts the right ajax calls from the website based on both visual analysis and via captured HAR logs",
-  "Uses those calls to fetch the reviews subsequently. So, getting top 100 reviews doesn't need to scrape the website AGAIN."
+  "Instead of scraping the dom, identifies the right api call.",
+  "Fast, reliable, complete data scraping for listing data is possible via API scraping. ",
+  "Strot figures the api call so you don't have to."
 ]} />
 </TLDR>
 
+[Try out Strot!](https://github.com/vertexcover-io/strot)
 
 {/* truncate */}
 
 
+<YouTubeEmbed videoId="OCL3rWG9mDs" title="Strot - The API Scraper Demo" />
+
 ## What if ... ?
+
+When working with clients, we figured that they frequently need to scrape listing data like reviews and product listings. The DOM Scraping solutions don't give complete data.
 
 When is comes to scraping reviews, things CAN BE slightly different than running playwright scripts. That's the idea we started with! 
 
 It stems from the insights on browsing shopify. Since, shopify has plugin ecosystem, a lot of reviews come from plugins. They give the reviews in html / json form via api that the page renders. 
 Since, reviews - if they are worthwhile - would be in 100s for a given product, it would be very unlikely that someone with good web-dev practices will send all of them on one shot. There MUST be a second call (pagination) that requests for further reviews for the given product. 
 
-What if ... we could scrape reviews via intercepting AJAX calls that are made from the browser? 
+What if ... we could scrape listing data via intercepting AJAX calls that are made from the browser itself? 
 
 
 ## The Genesis 
 
-Hence, an experiment is born - called `strot`. In sanskrit it means source. We are trying to get to the ajax calls that gets us reviews. 
+Hence, an experiment is born - called `strot`. In sanskrit it means source. We are trying to get to the ajax calls that gets us listing data. 
 
 The review scraping problem sits at a unique position. There are always MANY reviews which either causes cost ballooning no matter which existing approach you take.
 
-<DeepDive title="System Architecture & Technical Approach">
+Strot is the only project which can scrape the data available as api call - at all - using natural language.
 
-Strot's architecture consists of three main components working in sequence:
-
-**1. HAR File Analysis Pipeline**
-- Captures network traffic using browser automation (Playwright/Puppeteer)
-- Filters AJAX/XHR requests that match review-related patterns
-- Builds a candidates list of potential review API endpoints
-
-**2. Visual-Content Correlation Engine**
-- Takes screenshot of the page showing reviews
-- Uses vision models (Claude-4-sonnet) to extract review text from screenshots
-- Performs fuzzy matching between screenshot content and API response data
-
-**3. Pagination Strategy Detection**
-- Analyzes request parameters to identify pagination patterns
-- Common patterns: `page`, `offset`, `cursor`, `after`, `next_token`
-- Reverse engineers pagination logic from multiple API calls
-
-</DeepDive>
-
-Claims: 
-Strot is the only project which can scrape the data available as ajax call - at all - using natural language.
-
-
-<TechnicalCard type="architecture" title="Why AJAX Interception vs DOM Scraping">
-
-Traditional DOM scraping faces several fundamental limitations:
-
-- **Rate Limiting**: Websites throttle based on page loads, not API calls
-- **Bot Detection**: Full page loads trigger anti-bot measures (Cloudflare, etc.)
-- **Resource Overhead**: Loading entire DOM + assets vs lightweight JSON responses
-- **Maintenance Burden**: CSS selectors break with UI changes, APIs rarely change
-
-AJAX interception bypasses these by operating at the data layer, not presentation layer.
-
-</TechnicalCard> 
 
 <ComparisonTable 
   data={[
@@ -134,6 +103,61 @@ And the unique to us. Hence, we took a bite.
 But the challenge is which api call is most relevnt for scraping reviews ? 
 we solve this by capturing screenshot, visually analysing if review is preseng in the screenshot. Then we find a matching ajax call that has a similar content. Voila! 
 
+
+## The challenges of current approaches 
+
+Each traditional approach faces fundamental limitations that compound at scale:
+
+<TechnicalCard type="edge-case" title="The Listing Data has Volume Problem">
+
+Most products with worthwhile reviews have 100-10,000+ reviews. Traditional approaches cost:
+
+- **Playwright**: 100 reviews × 3 pages × 10s load time = 30+ minutes
+- **LLM Scraper**: 100 reviews × $0.10 per page = $10+ per product
+- **Manual API**: 100 reviews × 15min engineer time = $200+ per product
+
+Strot's approach: 100 reviews × 0.1s API call = 10 seconds total.
+
+</TechnicalCard>
+
+
+# Technical Details 
+
+
+<DeepDive title="System Architecture & Technical Approach">
+
+Strot's architecture consists of three main components working in sequence:
+
+**1. HAR File Analysis Pipeline**
+- Captures network traffic using browser automation (Playwright/Puppeteer)
+- Filters AJAX/XHR requests that match review-related patterns
+- Builds a candidates list of potential review API endpoints
+
+**2. Visual-Content Correlation Engine**
+- Takes screenshot of the page showing reviews
+- Uses vision models (Claude-4-sonnet) to extract review text from screenshots
+- Performs fuzzy matching between screenshot content and API response data
+
+**3. Pagination Strategy Detection**
+- Analyzes request parameters to identify pagination patterns
+- Common patterns: `page`, `offset`, `cursor`, `after`, `next_token`
+- Reverse engineers pagination logic from multiple API calls
+
+</DeepDive>
+
+<TechnicalCard type="architecture" title="Why AJAX Interception vs DOM Scraping">
+
+Traditional DOM scraping faces several fundamental limitations:
+
+- **Rate Limiting**: Websites throttle based on page loads, not API calls
+- **Bot Detection**: Full page loads trigger anti-bot measures (Cloudflare, etc.)
+- **Resource Overhead**: Loading entire DOM + assets vs lightweight JSON responses
+- **Maintenance Burden**: CSS selectors break with UI changes, APIs rarely change
+
+AJAX interception bypasses these by operating at the data layer, not presentation layer.
+
+</TechnicalCard> 
+
 <TechnicalCard type="implementation" title="AJAX Call Matching Algorithm">
 
 Our matching algorithm works in stages:
@@ -164,23 +188,8 @@ This helps by:
 
 </TechnicalCard>
 
-## The challenges of current approaches 
 
-Each traditional approach faces fundamental limitations that compound at scale:
-
-<TechnicalCard type="edge-case" title="The Review Volume Problem">
-
-Most products with worthwhile reviews have 100-10,000+ reviews. Traditional approaches cost:
-
-- **Playwright**: 100 reviews × 3 pages × 10s load time = 30+ minutes
-- **LLM Scraper**: 100 reviews × $0.10 per page = $10+ per product
-- **Manual API**: 100 reviews × 15min engineer time = $200+ per product
-
-Strot's approach: 100 reviews × 0.1s API call = 10 seconds total.
-
-</TechnicalCard>
-
-## The codegen 
+### The codegen 
 
 We internally represent all the relevant information as json. This helps us to generate http client in any language of choice. Calling this API endpoint in succession will give all the reviews.
 
