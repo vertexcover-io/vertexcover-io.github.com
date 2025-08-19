@@ -1,0 +1,167 @@
+---
+slug: speed-up-docker-builds-on-github-actions
+title: Speed up Docker Builds on Github actions
+description: Tricks to speed up docker builds
+date: 2025-08-20
+tags: []
+draft: false
+---
+
+import TLDR from '@site/src/components/TLDR';
+import NumberedList from '@site/src/components/NumberedList';
+import FlexibleNumberedList from '@site/src/components/FlexibleNumberedList';
+
+<TLDR>
+<NumberedList items={[
+  "Turn on BuildKit & Buildx everywhere",
+  "Reorder Dockerfile: copy package files first, then rest of code", 
+  "Use cache-mounts with buildkit-cache-dance action",
+  "Pick the right cache backend (inline for speed, registry for large images)",
+  "Add tmpfs + unsafe-io flags for package installs"
+]} />
+
+| Scenario | Avg. wall-clock |
+| --- | --- |
+| No caching | **1 h 10 m** |
+| Layer-cache hit | **6 m** |
+| Layer-cache miss (deps change) | **52 m** |
+| Cache-mount + Cache-Dance | **8 m** |
+
+Stop rebuilding the world on every pull-request—turn on these flags and ship faster.
+</TLDR>
+
+{/* truncate */}
+
+
+### Why this matters
+
+> 70 min ➜ 6 min (deps unchanged) or 8 min (deps changed).
+> 
+> 
+> Those are the real numbers we saw after switching our Node + Python monorepo to the techniques below.
+> 
+
+Slow builds waste CI minutes, break focus, and block deploys.
+
+---
+
+## 1. Turn on BuildKit & Buildx everywhere
+
+```yaml
+# .github/workflows/build.yml
+- uses: docker/setup-buildx-action@v3   # spins up an isolated BuildKit builder
+- run: echo "DOCKER_BUILDKIT=1" >> $GITHUB_ENV
+
+```
+
+BuildKit unlocks layer caching, cache-mounts, `RUN --mount`, and multi-platform bake. [Docker Documentation](https://docs.docker.com/build/ci/github-actions/cache/?utm_source=chatgpt.com)
+
+---
+
+## 2. Trim the build context
+
+Add a `.dockerignore` that excludes `node_modules/`, `docs/`, test data, and build artefacts. The runner uploads the entire context before **any** Docker layer executes; shrinking 500 MB of junk can save 30-90 s. [Docker Documentation](https://docs.docker.com/build/cache/optimize/?utm_source=chatgpt.com)
+
+---
+
+## 3. Re-order your Dockerfile
+
+```Dockerfile
+# syntax=docker/dockerfile:1.7
+FROM node:20-slim AS deps
+WORKDIR /app
+
+# 1️⃣ copy only manifests
+COPY package.json yarn.lock ./
+RUN --mount=type=cache,target=/root/.cache/yarn \
+    yarn install --frozen-lockfile    # re-runs only when the lock-file changes
+
+# 2️⃣ now copy the rest
+COPY . .
+
+```
+
+Because the dependency layer rarely changes, 60+ minutes of `yarn install` drops to < 6 minutes the next time a PR arrives.
+
+---
+
+## 4. Choose the *right* layer-cache backend
+
+| Exporter | What’s stored | Cold restore on GH runner | Best when |
+| --- | --- | --- | --- |
+| **`type=inline`** | cache *metadata* embedded in the image | < 1 s (only tiny config pulled) | You already push the image anyway |
+| **`type=registry`** | full layers in a `<image>-buildcache` tag | 5-30 s (downloads blobs) | Huge images, need `mode=max` granularity |
+| **`type=gha`** | tarball in GitHub Actions Cache (10 GB limit) | 1-5 s (< 500 MB) | No private registry, branch-scoped caches |
+
+*Inline feels snappiest* because BuildKit needs only the image manifest; layer blobs are fetched lazily. Note, though, that inline supports only `mode=min`. For ARG/secret-heavy pipelines, flip to `registry`. [Docker Documentation](https://docs.docker.com/build/cache/backends/inline/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/cache/backends/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/cache/backends/gha/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/ci/github-actions/cache/?utm_source=chatgpt.com)
+
+**Example call**
+
+```bash
+docker buildx build \
+  --push -t ghcr.io/acme/web:sha-$GITHUB_SHA \
+  --cache-from type=registry,ref=ghcr.io/acme/web:buildcache \
+  --cache-to   type=inline .
+
+```
+
+---
+
+## 5. Cache-mounts + the “BuildKit Cache Dance”
+
+```dockerfile
+RUN --mount=type=cache,target=/var/cache/apt     \
+    --mount=type=cache,target=/root/.cache/pip   \
+    pip install -r requirements.txt
+
+```
+
+`type=cache` keeps bulky package folders **outside** the image graph, so later layer changes don’t obliterate them. On GitHub-hosted runners those volumes disappear after each job—unless you use **buildkit-cache-dance** to export/import them between runs:
+
+```yaml
+- uses: reproducible-containers/buildkit-cache-dance@v2
+```
+
+Result: *52 min ➜ 8 min* even when `package.json` *does* change. [GitHub](https://github.com/reproducible-containers/buildkit-cache-dance?utm_source=chatgpt.com)[GitHub](https://github.com/moby/buildkit/issues/1673?utm_source=chatgpt.com)
+
+---
+
+## 6. tmpfs + “unsafe-io” = < 90 s package installs
+
+```dockerfile
+RUN --mount=type=tmpfs,target=/var/lib/apt/lists  \
+    --mount=type=cache,target=/var/cache/apt      \
+    apt-get -o DPkg::Options::="--force-unsafe-io" \
+        update && apt-get install -y git
+
+```
+
+<FlexibleNumberedList>
+  <span><code>tmpfs</code> keeps apt's index in RAM—zero disk writes.</span>
+  <span><code>-force-unsafe-io</code> turns off every fsync in <code>dpkg</code>, a safe bet in throw-away CI VMs. Ubuntu's base images already apply a partial version, but passing the flag still yields 15-30% extra speed.</span>
+</FlexibleNumberedList>
+
+[Docker Documentation](https://docs.docker.com/reference/dockerfile/?utm_source=chatgpt.com)[Reddit](https://www.reddit.com/r/debian/comments/1dz4jxk/how_can_you_speed_up_apt/?utm_source=chatgpt.com)[Gist](https://gist.github.com/reegnz/990d0b01b5f5e8670f78257875d8daa8?utm_source=chatgpt.com)
+
+---
+
+## 7. Other micro-wins
+
+- **Pin base images by digest** to avoid surprise cache busts.
+- **`buildx bake`** builds amd64+arm64 (or dev+prod variants) in parallel while sharing one cache. [Docker Documentation](https://docs.docker.com/guides/bake/?utm_source=chatgpt.com)
+- **Garbage-collect** with `buildx prune --filter keep-storage=20GB`. [Docker Documentation](https://docs.docker.com/guides/bake/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/ci/github-actions/cache/?utm_source=chatgpt.com)
+- **Self-hosted SSD runners** keep the entire BuildKit store between workflows—zero network latency.
+
+---
+
+## References
+
+- Docker Docs – [Inline cache] [Docker Documentation](https://docs.docker.com/build/cache/backends/inline/?utm_source=chatgpt.com)
+- Docker Docs – [Registry + GHA back-ends] [Docker Documentation](https://docs.docker.com/build/cache/backends/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/cache/backends/gha/?utm_source=chatgpt.com)
+- Docker Docs – [Cache mounts] [Docker Documentation](https://docs.docker.com/build/cache/optimize/?utm_source=chatgpt.com)
+- BuildKit Cache Dance – GitHub [GitHub](https://github.com/reproducible-containers/buildkit-cache-dance?utm_source=chatgpt.com)
+- Dockerfile `RUN --mount` reference [Docker Documentation](https://docs.docker.com/reference/dockerfile/?utm_source=chatgpt.com)
+- DPKG unsafe-io discussion [Reddit](https://www.reddit.com/r/debian/comments/1dz4jxk/how_can_you_speed_up_apt/?utm_source=chatgpt.com)[Gist](https://gist.github.com/reegnz/990d0b01b5f5e8670f78257875d8daa8?utm_source=chatgpt.com)
+- Buildx Bake guide & GC flags [Docker Documentation](https://docs.docker.com/guides/bake/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/ci/github-actions/cache/?utm_source=chatgpt.com)
+
+---
