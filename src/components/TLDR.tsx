@@ -6,18 +6,11 @@ interface TLDRProps {
 
 export default function TLDR({ children }: TLDRProps) {
   return (
-    <div style={{
-      backgroundColor: '#f8f9fa',
-      border: '1px solid #dee2e6',
-      borderRadius: '8px',
-      padding: '16px',
-      margin: '20px 0',
-      borderLeft: '4px solid #007bff'
-    }}>
-      <strong style={{ color: '#007bff', fontSize: '14px', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+    <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 my-5 border-l-4 border-l-blue-500 dark:border-l-blue-400">
+      <strong className="text-blue-600 dark:text-blue-400 text-sm uppercase tracking-wide font-semibold">
         TL;DR:
       </strong>
-      <div style={{ marginTop: '8px' }}>
+      <div className="mt-2 text-gray-800 dark:text-gray-200">
         {children}
       </div>
     </div>

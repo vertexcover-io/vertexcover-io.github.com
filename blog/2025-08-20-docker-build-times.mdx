@@ -54,13 +54,13 @@ Slow builds waste CI minutes, break focus, and block deploys.
 
 ```
 
-BuildKit unlocks layer caching, cache-mounts, `RUN --mount`, and multi-platform bake. [Docker Documentation](https://docs.docker.com/build/ci/github-actions/cache/?utm_source=chatgpt.com)
+BuildKit unlocks layer caching, cache-mounts, `RUN --mount`, and multi-platform bake ([BuildKit documentation](https://docs.docker.com/build/ci/github-actions/cache/)).
 
 ---
 
 ## 2. Trim the build context
 
-Add a `.dockerignore` that excludes `node_modules/`, `docs/`, test data, and build artefacts. The runner uploads the entire context before **any** Docker layer executes; shrinking 500 MB of junk can save 30-90 s. [Docker Documentation](https://docs.docker.com/build/cache/optimize/?utm_source=chatgpt.com)
+Add a `.dockerignore` that excludes `node_modules/`, `docs/`, test data, and build artefacts. The runner uploads the entire context before **any** Docker layer executes; shrinking 500 MB of junk can save 30-90 s ([build optimization guide](https://docs.docker.com/build/cache/optimize/)).
 
 ---
 
@@ -93,7 +93,7 @@ Because the dependency layer rarely changes, 60+ minutes of `yarn install` drops
 | **`type=registry`** | full layers in a `<image>-buildcache` tag | 5-30 s (downloads blobs) | Huge images, need `mode=max` granularity |
 | **`type=gha`** | tarball in GitHub Actions Cache (10 GB limit) | 1-5 s (< 500 MB) | No private registry, branch-scoped caches |
 
-*Inline feels snappiest* because BuildKit needs only the image manifest; layer blobs are fetched lazily. Note, though, that inline supports only `mode=min`. For ARG/secret-heavy pipelines, flip to `registry`. [Docker Documentation](https://docs.docker.com/build/cache/backends/inline/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/cache/backends/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/cache/backends/gha/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/ci/github-actions/cache/?utm_source=chatgpt.com)
+*Inline feels snappiest* because BuildKit needs only the image manifest; layer blobs are fetched lazily. Note, though, that inline supports only `mode=min`. For ARG/secret-heavy pipelines, flip to `registry` ([inline cache guide](https://docs.docker.com/build/cache/backends/inline/), [cache backends overview](https://docs.docker.com/build/cache/backends/), [GitHub Actions cache](https://docs.docker.com/build/cache/backends/gha/)).
 
 **Example call**
 
@@ -122,7 +122,7 @@ RUN --mount=type=cache,target=/var/cache/apt     \
 - uses: reproducible-containers/buildkit-cache-dance@v2
 ```
 
-Result: *52 min ➜ 8 min* even when `package.json` *does* change. [GitHub](https://github.com/reproducible-containers/buildkit-cache-dance?utm_source=chatgpt.com)[GitHub](https://github.com/moby/buildkit/issues/1673?utm_source=chatgpt.com)
+Result: *52 min ➜ 8 min* even when `package.json` *does* change ([buildkit-cache-dance repo](https://github.com/reproducible-containers/buildkit-cache-dance), [BuildKit cache issue discussion](https://github.com/moby/buildkit/issues/1673)).
 
 ---
 
@@ -141,27 +141,52 @@ RUN --mount=type=tmpfs,target=/var/lib/apt/lists  \
   <span><code>-force-unsafe-io</code> turns off every fsync in <code>dpkg</code>, a safe bet in throw-away CI VMs. Ubuntu's base images already apply a partial version, but passing the flag still yields 15-30% extra speed.</span>
 </FlexibleNumberedList>
 
-[Docker Documentation](https://docs.docker.com/reference/dockerfile/?utm_source=chatgpt.com)[Reddit](https://www.reddit.com/r/debian/comments/1dz4jxk/how_can_you_speed_up_apt/?utm_source=chatgpt.com)[Gist](https://gist.github.com/reegnz/990d0b01b5f5e8670f78257875d8daa8?utm_source=chatgpt.com)
+([Dockerfile RUN reference](https://docs.docker.com/reference/dockerfile/), [APT speed optimization discussion](https://www.reddit.com/r/debian/comments/1dz4jxk/how_can_you_speed_up_apt/), [unsafe-io examples](https://gist.github.com/reegnz/990d0b01b5f5e8670f78257875d8daa8)).
 
 ---
 
 ## 7. Other micro-wins
 
 - **Pin base images by digest** to avoid surprise cache busts.
-- **`buildx bake`** builds amd64+arm64 (or dev+prod variants) in parallel while sharing one cache. [Docker Documentation](https://docs.docker.com/guides/bake/?utm_source=chatgpt.com)
-- **Garbage-collect** with `buildx prune --filter keep-storage=20GB`. [Docker Documentation](https://docs.docker.com/guides/bake/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/ci/github-actions/cache/?utm_source=chatgpt.com)
+- **`buildx bake`** builds amd64+arm64 (or dev+prod variants) in parallel while sharing one cache ([buildx bake guide](https://docs.docker.com/guides/bake/)).
+- **Garbage-collect** with `buildx prune --filter keep-storage=20GB` ([cache management guide](https://docs.docker.com/build/ci/github-actions/cache/)).
 - **Self-hosted SSD runners** keep the entire BuildKit store between workflows—zero network latency.
 
 ---
 
 ## References
 
-- Docker Docs – [Inline cache] [Docker Documentation](https://docs.docker.com/build/cache/backends/inline/?utm_source=chatgpt.com)
-- Docker Docs – [Registry + GHA back-ends] [Docker Documentation](https://docs.docker.com/build/cache/backends/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/cache/backends/gha/?utm_source=chatgpt.com)
-- Docker Docs – [Cache mounts] [Docker Documentation](https://docs.docker.com/build/cache/optimize/?utm_source=chatgpt.com)
-- BuildKit Cache Dance – GitHub [GitHub](https://github.com/reproducible-containers/buildkit-cache-dance?utm_source=chatgpt.com)
-- Dockerfile `RUN --mount` reference [Docker Documentation](https://docs.docker.com/reference/dockerfile/?utm_source=chatgpt.com)
-- DPKG unsafe-io discussion [Reddit](https://www.reddit.com/r/debian/comments/1dz4jxk/how_can_you_speed_up_apt/?utm_source=chatgpt.com)[Gist](https://gist.github.com/reegnz/990d0b01b5f5e8670f78257875d8daa8?utm_source=chatgpt.com)
-- Buildx Bake guide & GC flags [Docker Documentation](https://docs.docker.com/guides/bake/?utm_source=chatgpt.com)[Docker Documentation](https://docs.docker.com/build/ci/github-actions/cache/?utm_source=chatgpt.com)
+<ul style={{ paddingLeft: '20px', margin: '16px 0', lineHeight: '1.6' }}>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://docs.docker.com/build/cache/backends/inline/" target="_blank" rel="noopener noreferrer">Inline cache documentation</a> - Docker Docs
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://docs.docker.com/build/cache/backends/" target="_blank" rel="noopener noreferrer">Cache backends overview</a> - Docker Docs
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://docs.docker.com/build/cache/backends/gha/" target="_blank" rel="noopener noreferrer">GitHub Actions cache backend</a> - Docker Docs
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://docs.docker.com/build/cache/optimize/" target="_blank" rel="noopener noreferrer">Build cache optimization guide</a> - Docker Docs
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://github.com/reproducible-containers/buildkit-cache-dance" target="_blank" rel="noopener noreferrer">BuildKit Cache Dance repository</a> - GitHub
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://docs.docker.com/reference/dockerfile/" target="_blank" rel="noopener noreferrer">Dockerfile RUN --mount reference</a> - Docker Docs
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://www.reddit.com/r/debian/comments/1dz4jxk/how_can_you_speed_up_apt/" target="_blank" rel="noopener noreferrer">APT speed optimization discussion</a> - Reddit
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://gist.github.com/reegnz/990d0b01b5f5e8670f78257875d8daa8" target="_blank" rel="noopener noreferrer">DPKG unsafe-io examples</a> - GitHub Gist
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://docs.docker.com/guides/bake/" target="_blank" rel="noopener noreferrer">Buildx bake guide</a> - Docker Docs
+  </li>
+  <li style={{ marginBottom: '8px' }}>
+    <a href="https://docs.docker.com/build/ci/github-actions/cache/" target="_blank" rel="noopener noreferrer">Cache management on GitHub Actions</a> - Docker Docs
+  </li>
+</ul>
 
 ---

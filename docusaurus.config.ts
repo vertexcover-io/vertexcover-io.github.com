@@ -121,6 +121,7 @@ const config: Config = {
         // },
         {to: '/', label: 'Blog', position: 'left', exact: true},
         {to: '/projects', label: 'Projects', position: 'left'},
+        {to: '/about-us', label: 'About Us', position: 'left'},
         {
           href: 'https://github.com/vertexcover-io',
           position: 'right',
