@@ -9,15 +9,11 @@ abeeshake:
     github: TwistingTwists
 
 ritesh:
-  name: Ritesh
-  title: Founder, Vertexcover
-  # url: https://sebastienlorber.com
-  # image_url: https://github.com/slorber.png
-  # page:
-  #   # customize the url of the author page at /blog/authors/<permalink>
-  #   permalink: '/all-sebastien-lorber-articles'
-  # socials:
-  #   x: sebastienlorber
-  #   linkedin: sebastienlorber
-  #   github: slorber
-  #   newsletter: https://thisweekinreact.com
+  name: Ritesh Kadmawala
+  title: Founder, Vertexcover Labs - AI-native engineering studio
+  url: https://www.vertexcover.io
+  image_url: https://github.com/kgritesh.png
+  page: true
+  socials:
+    linkedin: riteshkadmawala
+    github: kgritesh

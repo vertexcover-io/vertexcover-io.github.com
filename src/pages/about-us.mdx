@@ -1,0 +1,151 @@
+import { ClientCard } from '../components/ClientCard';
+import { ProfileSection } from '../components/ProfileSection';
+import { ProjectTable } from '../components/ProjectTable';
+import { ExpertiseGrid } from '../components/ExpertiseGrid';
+
+# About Vertexcover
+
+Vertexcover Labs is an AI-native engineering studio that partners with **seed-funded AI startups** to turn prototypes into **production-grade** Generative AI & NLP systems.
+
+## Core expertise
+
+<ExpertiseGrid areas={[
+  {
+    title: "Multi-agent Systems",
+    description: "Planning, Tool Calls, Reflection and Reliability - Building intelligent systems that can coordinate, plan, and execute complex tasks autonomously.",
+    icon: "🤖",
+    color: {
+      bg: "bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20",
+      border: "border-purple-200 dark:border-purple-700",
+      text: "text-purple-900 dark:text-purple-100",
+      icon: "bg-purple-100 dark:bg-purple-800/50"
+    }
+  },
+  {
+    title: "AI Search",
+    description: "RAG, Semantic Search, Hybrid Search, Knowledge Graphs - Advanced information retrieval systems that understand context and meaning.",
+    icon: "🔍",
+    color: {
+      bg: "bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20",
+      border: "border-green-200 dark:border-green-700",
+      text: "text-green-900 dark:text-green-100",
+      icon: "bg-green-100 dark:bg-green-800/50"
+    }
+  },
+  {
+    title: "AI Image/Video",
+    description: "Analysis, Understanding, Generation - Computer vision systems that can interpret, analyze, and create visual content intelligently.",
+    icon: "🎨",
+    color: {
+      bg: "bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20",
+      border: "border-orange-200 dark:border-orange-700",
+      text: "text-orange-900 dark:text-orange-100",
+      icon: "bg-orange-100 dark:bg-orange-800/50"
+    }
+  },
+  {
+    title: "AI Scrapers/Browser Agents",
+    description: "Intelligent web automation and data extraction systems that can navigate, understand, and interact with web interfaces like humans.",
+    icon: "🌐",
+    color: {
+      bg: "bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20",
+      border: "border-blue-200 dark:border-blue-700",
+      text: "text-blue-900 dark:text-blue-100",
+      icon: "bg-blue-100 dark:bg-blue-800/50"
+    }
+  }
+]} />
+
+## Marquee AI clients (with proof links)
+
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+  <ClientCard
+    name="Springworks (Albus)"
+    description="Built an agentic platform with 20+ connectors (email, docs, CRM, tasks), memory layers, guardrails, and safe action execution."
+    link="https://jina.ai/news/albus-by-springworks-empowering-employees-with-enterprise-search/"
+    videoLink="https://www.youtube.com/watch?v=Cu9UW1Tscj4"
+    revenue="> 25 Million USD ARR"
+    tags={['Multi-agent', 'Enterprise Search', 'Connectors']}
+  />
+  
+  <ClientCard
+    name="Notch.ai"
+    description="End-to-end pipeline to structure messy inputs (videos, testimonials, websites, competitors), generate high-quality ad concepts, content, and final creatives."
+    link="https://usenotch.ai"
+    revenue="Raised 8M USD"
+    tags={['Content Generation', 'Ad Tech', 'AI Pipeline']}
+  />
+  
+  <ClientCard
+    name="Rephrase.ai"
+    description="AI Powered Blog to Video Platform. Built video rendering pipeline for AI-driven text-to-video platform."
+    link="https://timesofindia.indiatimes.com/gadgets-news/adobe-buys-indian-generative-ai-startup-rephrase-ai-what-makes-the-deal-important/articleshow/105425071.cms"
+    revenue="Acquired by Adobe"
+    tags={['Text-to-Video', 'Video Rendering', 'AI Generation']}
+  />
+  
+  <ClientCard
+    name="Pcloudy - QPilot AI"
+    description="Natural-language to end-to-end test scripts, with eval/observability loops and auto-healing capabilities."
+    link="http://pcloudy.com/qpilotai/"
+    videoLink="https://www.youtube.com/watch?v=Vxrm3ahOwJQ"
+    tags={['Test Automation', 'Natural Language', 'Auto-healing']}
+  />
+  
+  <ClientCard
+    name="Invideo.ai"
+    description="Led Engineering Team for video generation platform."
+    revenue="> 50 Million USD ARR"
+    tags={['Video Generation', 'Engineering Leadership']}
+  />
+  
+  <ClientCard
+    name="Mathocrat.com"
+    description="Video-on-Demand service with 1000+ subscribers. Transcode and deliver videos (DRM) to students."
+    link="http://Mathocrat.com"
+    tags={['Video Streaming', 'DRM', 'EdTech']}
+  />
+</div>
+
+<ProjectTable projects={[
+  {
+    name: "Locatr",
+    description: "Resilient element locator for UI automation across frameworks",
+    category: "UI Automation",
+    link: "https://github.com/vertexcover-io/locatr"
+  },
+  {
+    name: "Strot",
+    description: "API Scraper Agent 7x faster than firecrawl.dev/browseruse",
+    category: "API Tools",
+    link: "https://github.com/vertexcover-io/strot"
+  },
+  {
+    name: "Notion CLI",
+    description: "CLI + MCP for AI-powered Notion CRUD operations",
+    category: "Productivity",
+    link: "https://github.com/vertexcover-io/notion-cli-ai"
+  },
+  {
+    name: "JsonPartial",
+    description: "Repair imperfect JSON from Large Language Models",
+    category: "Library",
+    downloads: "13k",
+    link: "https://crates.io/crates/json_partial"
+  },
+  {
+    name: "PubSub System",
+    description: "Lightweight publish-subscribe messaging with Tokio",
+    category: "Systems",
+    link: "https://github.com/tripathi456/event_bus_tokio"
+  }
+]} />
+
+
+<ProfileSection 
+  name="Ritesh Kadmawala"
+  title="Founder, Vertexcover Labs - AI-native engineering studio"
+  imageUrl="https://github.com/kgritesh.png"
+  linkedinUrl="https://www.linkedin.com/in/riteshkadmawala/"
+  githubUrl="https://github.com/kgritesh"
+/>

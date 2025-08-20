@@ -12,3 +12,8 @@ context-engineering:
   label: Context Engineering
   permalink: /context-engineering
   description: Context Engineering
+
+infra:
+  label: Infrastructure
+  permalink: /infra
+  description: Infrastructure
