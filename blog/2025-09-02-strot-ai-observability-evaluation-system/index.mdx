@@ -1,0 +1,273 @@
+---
+slug: "ai-observability-evaluation-framework"
+title: "How We Built Observability and Evaluation for Strot"
+authors: [synacktra]
+date: 2025-01-02T00:00:00+00:00
+draft: false
+---
+
+import NumberedList from '@site/src/components/NumberedList';
+import TLDR from '@site/src/components/TLDR';
+import TechnicalCard from '@site/src/components/TechnicalCard';
+import DeepDive from '@site/src/components/DeepDive';
+import ImageSlider from '@site/src/components/ImageSlider';
+
+<TLDR>
+When you build AI systems that reverse-engineer websites — like [Strot](https://github.com/vertexcover-io/strot) — you need to know **exactly where things break** and **how to fix them fast**.
+
+We built two systems that work together:
+
+<NumberedList items={[
+  "Real-time observability for live debugging with visual screenshots and LLM traces",
+  "Multi-level evaluation for quality assurance with component isolation",
+  "Structured logging foundation that powers both systems with zero overhead"
+]} />
+</TLDR>
+
+Here's how we did it.
+
+{/* truncate */}
+
+---
+
+## The Problem: Debugging AI at Scale
+
+Strot's pipeline has three AI components that can each fail uniquely across thousands of websites:
+
+| Component | What It Does | Example Failure |
+|-----------|--------------|-----------------|
+| **Request Detection** | Finds network calls loading data | Picks non-related network call |
+| **Parameter Analysis** | Detects pagination & filter params | Misses `cursor` param, breaks pagination |
+| **Structured Extraction** | Generates Python to parse responses | Wrong JSON key mapping |
+
+We needed to see failures **as they happen** and test fixes **without running the whole pipeline**.
+
+---
+
+## Solution 1: Real-Time Observability Dashboard
+
+<TechnicalCard type="implementation" title="Visual Debugging Dashboard">
+
+**What we built:** A NextJS dashboard that shows exactly how the pipeline executes.
+
+**What it shows:**
+
+<NumberedList items={[
+  "Browser screenshots at each step",
+  "Every LLM request/response with costs", 
+  "Generated code and validation results",
+  "Real-time token usage and spending"
+]} />
+
+**Why custom-built:** Off-the-shelf observability tools don't understand AI pipeline context like LLM reasoning, browser automation steps, or parameter detection results.
+
+</TechnicalCard>
+
+import observability_analysis_report_view from "./observability-analysis-report-view.png";
+import observability_raw_log_view from "./observability-raw-log-view.png";
+import observability_request_detection_step_view from "./observability-request-detection-step-view.png";
+import observability_parameter_detection_view from "./observability-parameter-detection-view.png";
+import observability_structured_extraction_view from "./observability-structured-extraction-view.png";
+
+<ImageSlider 
+  images={[
+    { 
+      src: observability_analysis_report_view, 
+      caption: "Analysis report overview" 
+    },
+    { 
+      src: observability_raw_log_view, 
+      caption: "Raw logs" 
+    },
+    { 
+      src: observability_request_detection_step_view, 
+      caption: "Request detection step" 
+    },
+    { 
+      src: observability_parameter_detection_view, 
+      caption: "Parameter detection step" 
+    },
+    { 
+      src: observability_structured_extraction_view, 
+      caption: "Structured extraction step" 
+    }
+  ]}
+/>  
+
+**Why it matters:** 
+- Debug visually — see the exact browser state when AI makes decisions
+- Track costs live — optimize model usage immediately
+- Diagnose failures instantly — no waiting for pipeline completion
+
+---
+
+## Solution 2: Multi-Level Evaluation
+
+We evaluate at three levels:
+
+### 1. Component Tests
+
+Test each AI step in isolation:
+
+```bash
+echo '[{
+  "request": {
+    "url": "https://api.example.com/products",
+    "queries": {"page": "2", "limit": "50"},
+    "post_data": {"sort": "price", "filter": "new"}
+  },
+  "expected_pagination_keys": ["page", "limit"],
+  "expected_dynamic_keys": ["sort", "filter"]
+}]' | uv run stroteval
+```
+
+**Result:** 10× faster debugging, every fix becomes a regression test.
+
+import component_eval_parameter_detection_first_view from './component-eval-parameter-detection-first-view.png'
+import component_eval_parameter_detection_second_view from './component-eval-parameter-detection-second-view.png'
+
+<ImageSlider 
+  images={[
+    { 
+      src: component_eval_parameter_detection_first_view, 
+      caption: "Parameter detection request input" 
+    },
+    { 
+      src: component_eval_parameter_detection_second_view, 
+      caption: "Parameter detection comparison and comment" 
+    }
+  ]}
+/>
+
+<TechnicalCard type="performance" title="Real Examples: Rapid Feature Development">
+
+Component isolation enabled us to quickly ship two major features:
+
+**SSR Request Detection:** Found that sites like `baseballamerica.myshopify.com` were causing infinite loops because we only captured AJAX calls, missing server-side rendered requests. Collected examples, implemented the fix, then used component evaluation to iterate on edge cases — all without running full pipelines.
+
+**Dynamic Filter Parameters:** Previously only supported pagination params. Users couldn't override sort/filter parameters. Collected request objects from previous runs, crafted an LLM prompt for unified parameter detection, then iterated on the prompt using component evaluation until all tests passed.
+
+Without component testing, each iteration would have required full pipeline runs — turning hours of testing into minutes.
+
+</TechnicalCard>
+
+### 2. End-to-End Tests
+
+Validate the complete pipeline:
+
+```bash
+echo '[{
+  "job_id": "existing-job-uuid",
+  "expected_source": "https://api.example.com/reviews",
+  "expected_pagination_keys": ["cursor", "limit"],
+  "expected_entity_count": 243
+},
+{
+  "site_url": "https://example.com/category/abc",
+  "query": "Listed products with name and prices",
+  "expected_source": "https://api.example.com/products",
+  "expected_pagination_keys": ["limit", "offset"],
+  "expected_entity_count": 100
+}] | uv run stroteval
+```
+
+**Result:** Catch system-level regressions before deployment.
+
+import e2e_metrics_view from "./e2e-metrics-view.png";
+import e2e_metrics_fail_success_comments_view from "./e2e-metrics-fail-success-comments-view.png";
+import e2e_metrics_analysis_steps_view from "./e2e-metrics-analysis-steps-view.png";
+
+<ImageSlider 
+  images={[
+    { 
+      src: e2e_metrics_view, 
+      caption: "End-to-end metrics" 
+    },
+    { 
+      src: e2e_metrics_fail_success_comments_view, 
+      caption: "End-to-end metrics failure and success comments" 
+    },
+    { 
+      src: e2e_metrics_analysis_steps_view, 
+      caption: "End-to-end metrics analysis steps" 
+    }
+  ]}
+/>
+
+### 3. Production Feedback Loop
+
+When E2E failures occur:
+1. Full context is logged (screenshots, LLM traces) 
+2. We identify the failed component in the dashboard
+3. We manually create a targeted component test
+
+**Result:** The test suite gets stronger with every bug we investigate.
+
+---
+
+<DeepDive title="The Secret: Structured JSON Logs">
+
+**This is the key architectural decision** that makes both systems possible.
+
+Both systems read the same structured JSONL logs:
+
+```json
+{"event_type": "analysis", "step_count": 1, "status": "success", "sub_events": [...]}
+{"event_type": "parameter-detection", "status": "success", "pagination_keys": [...]}
+{"event_type": "structured-extraction", "code": "...", "default_entity_count": 25}
+```
+
+**What goes into evaluation metrics:** The request-detection analysis steps that show exactly how the API endpoint was discovered.
+
+**Why this changed everything:**
+
+<NumberedList items={[
+  "One log format powers both real-time UI and evaluation metrics",
+  "Zero overhead — observability comes for free", 
+  "Easy extensibility — new features just parse existing structure"
+]} />
+
+</DeepDive>
+
+---
+
+## Storing Results: Airtable for Metrics
+
+Evaluation results flow into structured tables:
+
+- **Component results** — Success rates per AI step
+- **E2E metrics** — Full pipeline performance
+- **Execution traces** — Screenshots and step details
+
+**Why Airtable?**
+Visual dashboards, team collaboration, automatic schema creation.
+
+---
+
+## Results
+
+Since implementing this dual approach:
+
+- **95% success rate** across 50+ website architectures
+- **10× faster debugging** through visual observability
+- **3× faster iteration** with component isolation
+- **Zero regressions** with systematic test coverage
+
+---
+
+## Key Takeaways
+
+<NumberedList items={[
+  "See everything — Visual debugging beats reading logs",
+  "Test in layers — Isolate failures before running full pipelines", 
+  "Close the loop — Production failures guide new component tests",
+  "One log format — Structure once, observe everywhere",
+  "Make it simple — CLI tools everyone can use"
+]} />
+
+**The framework transforms AI development from "hope it works" to "know it works."**
+
+---
+
+🔗 **Code**: [github.com/vertexcover-io/strot](https://github.com/vertexcover-io/strot)  
+📄 **Docs**: [Evaluation Guide](https://github.com/vertexcover-io/strot#-evaluation)
