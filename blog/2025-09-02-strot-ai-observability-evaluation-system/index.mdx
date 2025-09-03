@@ -30,7 +30,7 @@ Here's how we did it.
 
 ---
 
-## The Problem: Debugging AI at Scale
+## The Context: Rapidly Debugging AI Applications 
 
 Strot's pipeline has three AI components that can each fail uniquely across thousands of websites:
 
@@ -103,11 +103,11 @@ import observability_structured_extraction_view from "./observability-structured
 
 ## Solution 2: Multi-Level Evaluation
 
-We evaluate at three levels:
+We evaluate for LLM failures at three levels. This helps us find and fix errors faster since we can run each step in isolation.
 
 ### 1. Component Tests
 
-Test each AI step in isolation:
+We think of them as unit tests.
 
 ```bash
 echo '[{
@@ -205,7 +205,7 @@ When E2E failures occur:
 
 ---
 
-<DeepDive title="The Secret: Structured JSON Logs">
+<DeepDive title="The Secret: Structured JSON Logs for entire AI workflow">
 
 **This is the key architectural decision** that makes both systems possible.
 
@@ -244,26 +244,18 @@ Visual dashboards, team collaboration, automatic schema creation.
 
 ---
 
+import FlexibleNumberedList from '@site/src/components/FlexibleNumberedList';
+
 ## Results
 
 Since implementing this dual approach:
 
-- **95% success rate** across 50+ website architectures
-- **10× faster debugging** through visual observability
-- **3× faster iteration** with component isolation
-- **Zero regressions** with systematic test coverage
-
----
-
-## Key Takeaways
-
-<NumberedList items={[
-  "See everything — Visual debugging beats reading logs",
-  "Test in layers — Isolate failures before running full pipelines", 
-  "Close the loop — Production failures guide new component tests",
-  "One log format — Structure once, observe everywhere",
-  "Make it simple — CLI tools everyone can use"
-]} />
+<FlexibleNumberedList>
+  <span><strong>95% success rate</strong> across 50+ website architectures</span>
+  <span><strong>10× faster debugging</strong> through visual observability</span>
+  <span><strong>3× faster iteration</strong> with component isolation</span>
+  <span><strong>Zero regressions</strong> with systematic test coverage</span>
+</FlexibleNumberedList>
 
 **The framework transforms AI development from "hope it works" to "know it works."**
 
