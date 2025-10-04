@@ -16,6 +16,7 @@ const config: Config = {
 
   plugins: [
     "./src/plugins/tailwind-plugin.js",
+    "./src/plugins/learnings-plugin.js",
     // async function disableCssMinifier() {
     //   return {
     //     name: 'disable-css-minifier',
@@ -123,6 +124,7 @@ const config: Config = {
         // },
         {to: '/', label: 'Blog', position: 'left', exact: true},
         {to: '/projects', label: 'Projects', position: 'left'},
+        {to: '/learnings', label: 'Learnings', position: 'left'},
         {to: '/about-us', label: 'About Us', position: 'left'},
         {
           href: 'https://github.com/vertexcover-io',
