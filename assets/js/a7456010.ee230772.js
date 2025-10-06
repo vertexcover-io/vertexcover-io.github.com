@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[1235],{8552:e=>{e.exports=JSON.parse('{"name":"docusaurus-plugin-content-pages","id":"default"}')}}]);

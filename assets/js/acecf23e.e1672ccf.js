@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[903],{1912:e=>{e.exports=JSON.parse('{"blogBasePath":"/","blogTitle":"Blog","authorsListPath":"/authors"}')}}]);
