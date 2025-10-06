@@ -16,19 +16,19 @@ const config: Config = {
 
   plugins: [
     "./src/plugins/tailwind-plugin.js",
-    // async function disableCssMinifier() {
-    //   return {
-    //     name: 'disable-css-minifier',
-    //     configureWebpack(config, isServer) {
-    //       if (config.optimization && config.optimization.minimizer) {
-    //         config.optimization.minimizer = config.optimization.minimizer.filter(
-    //           minimizer => minimizer.constructor.name !== 'CssMinimizerPlugin'
-    //         );
-    //       }
-    //       return config;
-    //     },
-    //   };
-    // },
+    [
+      '@docusaurus/plugin-content-blog',
+      {
+        id: 'learnings',
+        routeBasePath: 'learnings',
+        path: './learnings',
+        blogTitle: 'Learnings',
+        blogDescription: 'Weekly learnings from the Vertexcover team',
+        blogSidebarTitle: 'All learnings',
+        blogSidebarCount: 'ALL',
+        showReadingTime: true,
+      },
+    ],
   ],
   
 
@@ -123,6 +123,7 @@ const config: Config = {
         // },
         {to: '/', label: 'Blog', position: 'left', exact: true},
         {to: '/projects', label: 'Projects', position: 'left'},
+        {to: '/learnings', label: 'Learnings', position: 'left'},
         {to: '/about-us', label: 'About Us', position: 'left'},
         {
           href: 'https://github.com/vertexcover-io',
