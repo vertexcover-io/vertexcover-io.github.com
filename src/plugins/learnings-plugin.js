@@ -55,17 +55,10 @@ module.exports = function learningsPlugin(context, options) {
             });
           }
 
-          const id = filename.replace(/\.mdx?$/, '');
-          const permalink = normalizeUrl([siteConfig.baseUrl, 'learnings', id]);
-
           return {
-            id,
-            metadata: {
-              ...metadata,
-              permalink,
-            },
+            id: filename.replace(/\.mdx?$/, ''),
+            metadata,
             content: content.replace(frontmatterRegex, '').trim(),
-            filePath,
           };
         })
       );
@@ -77,21 +70,8 @@ module.exports = function learningsPlugin(context, options) {
     },
 
     async contentLoaded({content, actions}) {
-      const {setGlobalData, addRoute} = actions;
+      const {setGlobalData} = actions;
       setGlobalData({learnings: content});
-
-      // Create routes for each learning
-      content.forEach((learning) => {
-        addRoute({
-          path: learning.metadata.permalink,
-          component: '@site/src/components/LearningPage.tsx',
-          exact: true,
-          modules: {
-            learning: learning.filePath,
-          },
-          customData: learning,
-        });
-      });
     },
 
     async postBuild({content, outDir}) {
