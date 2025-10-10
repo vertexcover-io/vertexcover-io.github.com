@@ -27,3 +27,13 @@ synacktra:
   socials:
     linkedin: synacktra
     github: synacktraa
+
+ranjan:
+  name: Ranjan Ojha
+  title: Software Engineer
+  url: https://github.com/hungerarray
+  image_url: https://github.com/hungerarray.png
+  page: true
+  socials:
+    github: hungerarray
+    linkedin: ojha-ranjan
