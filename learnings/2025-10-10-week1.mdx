@@ -1,0 +1,122 @@
+---
+title: "Weekly learnings: Week1"
+date: 2025-10-10
+type: weekly
+authors: [ranjan]
+tags: 
+draft: true
+---
+
+- [Container Checkpoint and Restore](#container-checkpoint-and-restore)
+  - [Limitations](#limitations)
+- [CPU Stalls](#cpu-stalls)
+- [Making `syscalls` in Linux](#making-syscalls-in-linux)
+- [Some tools used to deploy model](#some-tools-used-to-deploy-model)
+
+{/* truncate */}
+
+# Container Checkpoint and Restore
+
+Container checkpoint and restore is a facility by which any running Linux container is saved to memory 
+and later restored at a later time from the same point at which the checkpoint was created. This restore
+is not limited to a single device and can also be in a different remote computer.
+
+This was a project started by some "mad russians", and later merged into Linux Kernel, and is called 
+[`Checkpoint / Restore in Userspace (CRIU)`](https://criu.org/Main_Page). The sheer idea of saving a process that is currently 
+running and restoring it later in time is why this process was called mad, much like how the cryogenic
+sleep for humans is considered a fiction. Infact, this feature comes with lots of limitations mentioned 
+later. However, this is not an unproven technology. Such a thing has been done with VMs in the past.
+Despite all the limitations and issues that might come up, it's still widely used for the simple fact that
+it expedites the startup process.
+
+To create a checkpoint we have to create what is known as a container memory snapshot.
+A Container memory snapshot is when we basically take a copy of the entire state of a Linux Container. 
+For this we need to copy the entire container's filesystem, and process tree. Process tree itself contains
+all the memory mappings, file descriptor tables, registers, environment variables, process IDs, etc.
+
+Before `CRIU` was officially available, to create such a snapshot, it was necessary for users to maintain
+their own custom variant of the kernel with required features. However, with `CRIU` available in the mainline
+Linux Kernel, most of the container runtimes now do offer this facility. Of particular mention is `gVisor`. The 
+container runtime utility, `runsc` which stands for `run sandboxed container`, to it's counterpart `runc`, has 
+added functionality for checkpoint and restore. Given that `gVisor` has a usermode kernel functionality, it can 
+infact, offer more granularity and features for checkpoint and restore.
+
+## Limitations
+
+- While the restore can be made in different computer, it has to mimic the original system as much as possible. Otherwise the invariants that program expect to be maintained will be broken, and can lead to some nasty surprises down the line. 
+- The CPU that the restore is made on has to match the instruction set, where the snapshot was taken, otherwise there can be runtime issues with invalid opcode.
+- A container that utilizes GPU, is sensitive to differences in NVIDIA driver versions and in addition to container runtime versions.
+- Programs need to account for the fact that the machine IP might change in between restore.
+- A Problem documented in Modal documentation is that, there are some functions in `torch.cuda` that after restoring from snapshot will initialize CUDA as having zero GPU devices. The only fix is to reinitialize `torch.cuda` again.
+- In particular, when loading a huge snapshot, there is a significant CPU pressure as hundreds of 4KiB pages are getting loaded into memory. Such a particular workload is particularly affected by [CPU Stalls](#cpu-stalls).
+  
+# CPU Stalls
+
+To explain a CPU stall, we first need to understand that any given process is either running on the CPU or it's not. 
+There can never be in between. So what happens when we have 3 processes each granted 0.3 of CPU running on the system.
+
+For the above process, lets make a few assumptions. First is our CPU currently only has a single core and a single thread. Now, it's not really possible for us to divide this thread into 0.3 sections and grant each of the process
+running a section. As previously stated, a process is either running or not running, and when it is running it 
+utilizes 100% of the thread and when it's not running it utilizes 0% of the thread. So instead, CPU makes the 
+division in time instead. For our example, lets consider that the CPU segments 100ms of CPU time window. So, 
+with our 3 processes, in this 100ms window, each process gets 30ms of execution time, with the last 10ms being 
+wasted and non of our processes running. Again when a new 100ms window is created all 3 process are allowed to continue their run.
+
+Now, the issue is if you consider a compute intensive workload, it would really benefit off of that extra 10ms of 
+CPU time, but currently the way Linux schedular works, and also how the default CPU limits on pods by 
+kubernetes works, each of the process are allocated equal precedence. Hence, for performance critical processes, 
+it makes sense to also tune your application to get more CPU time. 
+
+However, in real world, we don't have a single CPU core, and most commercial CPU's nowadays offer capabilities for running 2 threads. Also of note, most of our applications when parallelized, will spawn additional threads along 
+with the main thread inside the running process. However, the CPU time granted to each is still at process level. 
+That means, if say our hypothetical application has 3 threads each running in the same CPU time window, now each of
+our thread will get 10ms of actual CPU time down from 30ms of time our single thread was getting. The problem is worsened if we have 10 threads and somehow all 10 threads are granted run in the same time, in different cores, then
+each thread only gets about 3ms of worktime. 
+
+This situation of having potentially adequate CPU power, but still being unable to utilize 100% of the CPU for 
+compute is known as CPU stall.
+
+In a single thread situation, the best way to deal with this issue is to grant higher priority to the process to 
+allow it to gain more CPU time. And in the case of multi threaded situation, infact it's actually much more
+beneficial to pin the process to a certain CPU core. Infact, many games actually see quite a significant performance
+boost when their processes are pinned to a few cores rather than allowing them access to all the cores.
+
+# Making `syscalls` in Linux
+
+Most of the program we write, ultimately have to make a `syscall` to do any operation on a system. Understandably, I
+had a misconception that the `syscalls` are themselves exposed over `C-API` and that any language that wishes to make
+a `syscall` had to at minimum link to a lower level `C library` like `libc` that does the work for them. However, 
+a particular note was we can have `golang` applications without `C-go`. While at the time, I hadn't connected the 
+dots, I was recently watching some video on getting the smallest kernel, and there I chanced upon the fact that to
+make a `syscall` you don't really need to bind to `C library`. You just need to be able to emit specific assembly instructions.
+
+A `syscall` is triggered by writing the particular `syscall` number into a particular register. Then calling the 
+`syscall`  instruction in CPU. This internally triggers a trap request, which is captured by Kernel.
+
+Given that it's assembly code, the following description is for how to perform a `syscall` in Linux, particular
+in x86_64 system.
+
+- First place the system call number into the `rax` register. `write syscall` is for instance number 1, and `read syscall` is number 0. For more `syscall` numbers visit [here](https://elixir.bootlin.com/linux/v6.13/source/arch/x86/entry/syscalls/syscall_64.tbl).
+
+- Place the arguments for the system call into the designated registers, 
+  - `rdi` (first argument)
+  - `rsi` (second argument)
+  - `rdx` (third argument)
+  - `r10` (fourth argument)
+  - `r8` (fifth argument)
+  - `r9` (sixth argument)
+  
+    This order is specified by the calling convention.
+    
+- Invoke the systemcall by executing the `syscall` instruction.
+
+- The return value is placed inside `rax`.
+
+# Some tools used to deploy model
+
+- [ray](https://www.ray.io/) Allows for distributed GPU computation
+  - [kuberay](https://docs.ray.io/en/latest/cluster/kubernetes/index.html) to deploy ray in kubernetes
+  
+- [Kubeflow](https://www.kubeflow.org/) 
+
+  A CNCF (Cloud Native Computing Formation) project, which is the foundation of tools for AI Platforms on Kubernetes. Of particular note is that recently in a conference, Ubucon, a speaker was telling that kubeflow is almost an industry standard for deploying AI in kubernetes.
