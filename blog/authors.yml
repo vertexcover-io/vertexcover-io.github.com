@@ -27,3 +27,14 @@ synacktra:
   socials:
     linkedin: synacktra
     github: synacktraa
+
+aksdev:
+  name: Aman Kumar Singh
+  title: Software Engineer Intern
+  url: https://github.com/amankumarsingh77
+  image_url: https://github.com/amankumarsingh77.png
+  page : true
+  socials:
+    linkedin: aksdev
+    github: amankumarsingh77
+
