@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[925],{2329:e=>{e.exports=JSON.parse('{"title":"All learnings","items":[{"title":"Example Daily Learning","permalink":"/learnings/2025/01/15/example-learning","unlisted":false,"date":"2025-01-15T00:00:00.000Z"}]}')}}]);

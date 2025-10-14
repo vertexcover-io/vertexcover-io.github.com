@@ -2,11 +2,220 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://blog.vertexcover.io/learnings</id>
     <title>Blog - Vertexcover Blog</title>
-    <updated>2025-01-15T00:00:00.000Z</updated>
+    <updated>2025-10-10T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://blog.vertexcover.io/learnings"/>
     <subtitle>Blog - Vertexcover Blog</subtitle>
     <icon>https://blog.vertexcover.io/img/favicon.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[Weekly learnings: Week1]]></title>
+        <id>https://blog.vertexcover.io/learnings/2025-10-ranjan-week1</id>
+        <link href="https://blog.vertexcover.io/learnings/2025-10-ranjan-week1"/>
+        <updated>2025-10-10T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[- Container Checkpoint and Restore]]></summary>
+        <content type="html"><![CDATA[<ul>
+<li><a href="https://blog.vertexcover.io/learnings/2025-10-ranjan-week1#container-checkpoint-and-restore">Container Checkpoint and Restore</a>
+<ul>
+<li><a href="https://blog.vertexcover.io/learnings/2025-10-ranjan-week1#limitations">Limitations</a></li>
+</ul>
+</li>
+<li><a href="https://blog.vertexcover.io/learnings/2025-10-ranjan-week1#cpu-stalls">CPU Stalls</a></li>
+<li><a href="https://blog.vertexcover.io/learnings/2025-10-ranjan-week1#making-syscalls-in-linux">Making <code>syscalls</code> in Linux</a></li>
+<li><a href="https://blog.vertexcover.io/learnings/2025-10-ranjan-week1#some-tools-used-to-deploy-model">Some tools used to deploy model</a></li>
+</ul>
+<!-- -->
+<p>Container checkpoint and restore is a facility by which any running Linux container is saved to memory
+and later restored at a later time from the same point at which the checkpoint was created. This restore
+is not limited to a single device and can also be in a different remote computer.</p>
+<p>This was a project started by some "mad russians", and later merged into Linux Kernel, and is called
+<a href="https://criu.org/Main_Page" target="_blank" rel="noopener noreferrer"><code>Checkpoint / Restore in Userspace (CRIU)</code></a>. The sheer idea of saving a process that is currently
+running and restoring it later in time is why this process was called mad, much like how the cryogenic
+sleep for humans is considered a fiction. Infact, this feature comes with lots of limitations mentioned
+later. However, this is not an unproven technology. Such a thing has been done with VMs in the past.
+Despite all the limitations and issues that might come up, it's still widely used for the simple fact that
+it expedites the startup process.</p>
+<p>To create a checkpoint we have to create what is known as a container memory snapshot.
+A Container memory snapshot is when we basically take a copy of the entire state of a Linux Container.
+For this we need to copy the entire container's filesystem, and process tree. Process tree itself contains
+all the memory mappings, file descriptor tables, registers, environment variables, process IDs, etc.</p>
+<p>Before <code>CRIU</code> was officially available, to create such a snapshot, it was necessary for users to maintain
+their own custom variant of the kernel with required features. However, with <code>CRIU</code> available in the mainline
+Linux Kernel, most of the container runtimes now do offer this facility. Of particular mention is <code>gVisor</code>. The
+container runtime utility, <code>runsc</code> which stands for <code>run sandboxed container</code>, to it's counterpart <code>runc</code>, has
+added functionality for checkpoint and restore. Given that <code>gVisor</code> has a usermode kernel functionality, it can
+infact, offer more granularity and features for checkpoint and restore.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="limitations">Limitations<a href="https://blog.vertexcover.io/learnings/2025-10-ranjan-week1#limitations" class="hash-link" aria-label="Direct link to Limitations" title="Direct link to Limitations" translate="no">​</a></h2>
+<ul>
+<li>While the restore can be made in different computer, it has to mimic the original system as much as possible. Otherwise the invariants that program expect to be maintained will be broken, and can lead to some nasty surprises down the line.</li>
+<li>The CPU that the restore is made on has to match the instruction set, where the snapshot was taken, otherwise there can be runtime issues with invalid opcode.</li>
+<li>A container that utilizes GPU, is sensitive to differences in NVIDIA driver versions and in addition to container runtime versions.</li>
+<li>Programs need to account for the fact that the machine IP might change in between restore.</li>
+<li>A Problem documented in Modal documentation is that, there are some functions in <code>torch.cuda</code> that after restoring from snapshot will initialize CUDA as having zero GPU devices. The only fix is to reinitialize <code>torch.cuda</code> again.</li>
+<li>In particular, when loading a huge snapshot, there is a significant CPU pressure as hundreds of 4KiB pages are getting loaded into memory. Such a particular workload is particularly affected by <a href="https://blog.vertexcover.io/learnings/2025-10-ranjan-week1#cpu-stalls">CPU Stalls</a>.</li>
+</ul>
+<h1>CPU Stalls</h1>
+<p>To explain a CPU stall, we first need to understand that any given process is either running on the CPU or it's not.
+There can never be in between. So what happens when we have 3 processes each granted 0.3 of CPU running on the system.</p>
+<p>For the above process, lets make a few assumptions. First is our CPU currently only has a single core and a single thread. Now, it's not really possible for us to divide this thread into 0.3 sections and grant each of the process
+running a section. As previously stated, a process is either running or not running, and when it is running it
+utilizes 100% of the thread and when it's not running it utilizes 0% of the thread. So instead, CPU makes the
+division in time instead. For our example, lets consider that the CPU segments 100ms of CPU time window. So,
+with our 3 processes, in this 100ms window, each process gets 30ms of execution time, with the last 10ms being
+wasted and non of our processes running. Again when a new 100ms window is created all 3 process are allowed to continue their run.</p>
+<p>Now, the issue is if you consider a compute intensive workload, it would really benefit off of that extra 10ms of
+CPU time, but currently the way Linux schedular works, and also how the default CPU limits on pods by
+kubernetes works, each of the process are allocated equal precedence. Hence, for performance critical processes,
+it makes sense to also tune your application to get more CPU time.</p>
+<p>However, in real world, we don't have a single CPU core, and most commercial CPU's nowadays offer capabilities for running 2 threads. Also of note, most of our applications when parallelized, will spawn additional threads along
+with the main thread inside the running process. However, the CPU time granted to each is still at process level.
+That means, if say our hypothetical application has 3 threads each running in the same CPU time window, now each of
+our thread will get 10ms of actual CPU time down from 30ms of time our single thread was getting. The problem is worsened if we have 10 threads and somehow all 10 threads are granted run in the same time, in different cores, then
+each thread only gets about 3ms of worktime.</p>
+<p>This situation of having potentially adequate CPU power, but still being unable to utilize 100% of the CPU for
+compute is known as CPU stall.</p>
+<p>In a single thread situation, the best way to deal with this issue is to grant higher priority to the process to
+allow it to gain more CPU time. And in the case of multi threaded situation, infact it's actually much more
+beneficial to pin the process to a certain CPU core. Infact, many games actually see quite a significant performance
+boost when their processes are pinned to a few cores rather than allowing them access to all the cores.</p>
+<h1>Making <code>syscalls</code> in Linux</h1>
+<p>Most of the program we write, ultimately have to make a <code>syscall</code> to do any operation on a system. Understandably, I
+had a misconception that the <code>syscalls</code> are themselves exposed over <code>C-API</code> and that any language that wishes to make
+a <code>syscall</code> had to at minimum link to a lower level <code>C library</code> like <code>libc</code> that does the work for them. However,
+a particular note was we can have <code>golang</code> applications without <code>C-go</code>. While at the time, I hadn't connected the
+dots, I was recently watching some video on getting the smallest kernel, and there I chanced upon the fact that to
+make a <code>syscall</code> you don't really need to bind to <code>C library</code>. You just need to be able to emit specific assembly instructions.</p>
+<p>A <code>syscall</code> is triggered by writing the particular <code>syscall</code> number into a particular register. Then calling the
+<code>syscall</code>  instruction in CPU. This internally triggers a trap request, which is captured by Kernel.</p>
+<p>Given that it's assembly code, the following description is for how to perform a <code>syscall</code> in Linux, particular
+in x86_64 system.</p>
+<ul>
+<li>
+<p>First place the system call number into the <code>rax</code> register. <code>write syscall</code> is for instance number 1, and <code>read syscall</code> is number 0. For more <code>syscall</code> numbers visit <a href="https://elixir.bootlin.com/linux/v6.13/source/arch/x86/entry/syscalls/syscall_64.tbl" target="_blank" rel="noopener noreferrer">here</a>.</p>
+</li>
+<li>
+<p>Place the arguments for the system call into the designated registers,</p>
+<ul>
+<li>
+<p><code>rdi</code> (first argument)</p>
+</li>
+<li>
+<p><code>rsi</code> (second argument)</p>
+</li>
+<li>
+<p><code>rdx</code> (third argument)</p>
+</li>
+<li>
+<p><code>r10</code> (fourth argument)</p>
+</li>
+<li>
+<p><code>r8</code> (fifth argument)</p>
+</li>
+<li>
+<p><code>r9</code> (sixth argument)</p>
+<p>This order is specified by the calling convention.</p>
+</li>
+</ul>
+</li>
+<li>
+<p>Invoke the systemcall by executing the <code>syscall</code> instruction.</p>
+</li>
+<li>
+<p>The return value is placed inside <code>rax</code>.</p>
+</li>
+</ul>
+<h1>Some tools used to deploy model</h1>
+<ul>
+<li>
+<p><a href="https://www.ray.io/" target="_blank" rel="noopener noreferrer">ray</a> Allows for distributed GPU computation</p>
+<ul>
+<li><a href="https://docs.ray.io/en/latest/cluster/kubernetes/index.html" target="_blank" rel="noopener noreferrer">kuberay</a> to deploy ray in kubernetes</li>
+</ul>
+</li>
+<li>
+<p><a href="https://www.kubeflow.org/" target="_blank" rel="noopener noreferrer">Kubeflow</a></p>
+<p>A CNCF (Cloud Native Computing Formation) project, which is the foundation of tools for AI Platforms on Kubernetes. Of particular note is that recently in a conference, Ubucon, a speaker was telling that kubeflow is almost an industry standard for deploying AI in kubernetes.</p>
+</li>
+</ul>]]></content>
+        <author>
+            <name>Ranjan Ojha</name>
+            <uri>https://github.com/hungerarray</uri>
+        </author>
+    </entry>
+    <entry>
+        <title type="html"><![CDATA[AI Video Cutter - Week 1 Learnings]]></title>
+        <id>https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1</id>
+        <link href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1"/>
+        <updated>2025-01-20T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Been working on this video cutting tool that uses AI to find optimal cut points. Some things worked, some things I had to completely rewrite. Here's what went down.]]></summary>
+        <content type="html"><![CDATA[<p>Been working on this video cutting tool that uses AI to find optimal cut points. Some things worked, some things I had to completely rewrite. Here's what went down.</p>
+<!-- -->
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="misunderstood-the-problem-statement">Misunderstood the problem statement<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#misunderstood-the-problem-statement" class="hash-link" aria-label="Direct link to Misunderstood the problem statement" title="Direct link to Misunderstood the problem statement" translate="no">​</a></h2>
+<p>Built this whole <code>find_optimal_cut_point()</code> function that finds the optimal cutpoint in a video considering the Start point and End Point given by the user. Used Whisper for speech detection, OpenCV for scene changes, added motion analysis. Worked great.</p>
+<p>Problem: Understood the problem statement wrong. It was "Find the optimal frame to cut near the timestamp that the user gives". Which means that the user already knows where to cut but is not precise at a frame level, So we just ask for the estimated timestamp and then look around to find the best frame to cut.</p>
+<p>Learnings : Always clarify the problem statement by repeating it to the person. So you both are on the same page.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="weighted-scoring-doesnt-work-for-hard-constraints">Weighted scoring doesn't work for hard constraints<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#weighted-scoring-doesnt-work-for-hard-constraints" class="hash-link" aria-label="Direct link to Weighted scoring doesn't work for hard constraints" title="Direct link to Weighted scoring doesn't work for hard constraints" translate="no">​</a></h2>
+<p>First version used a points system: sentence boundary +40pts, pause +30pts, scene change +30pts, etc. Add them up, pick highest score.</p>
+<p>Bug: System kept cutting mid-word because a scene change (30pts) + low motion (20pts) outscored a sentence boundary (40pts) by itself.</p>
+<p>Realized some rules aren't negotiable. You literally cannot cut while someone is speaking. It's not a preference, it's a constraint.</p>
+<p>Rewrote to use strict priority filtering:</p>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token comment" style="color:#999988;font-style:italic"># Priority 1: Remove all frames mid-speech (absolute)</span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token comment" style="color:#999988;font-style:italic"># Priority 2: Remove frames with motion &gt; 2.5 (strict)  </span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"></span><span class="token comment" style="color:#999988;font-style:italic"># Priority 3: Remove frames with blinks/open mouth (best effort)</span><br></span></code></pre></div></div>
+<p>Each filter runs sequentially. If all frames fail a priority, fallback to previous level. This will be changed as if there are no frames left after filtering then its not a good range to extract any cut point.</p>
+<p>If you catch yourself using weighted scoring to "compensate" for bad choices, you probably need filters instead.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="caching-saves-90-seconds-per-request">Caching saves 90 seconds per request<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#caching-saves-90-seconds-per-request" class="hash-link" aria-label="Direct link to Caching saves 90 seconds per request" title="Direct link to Caching saves 90 seconds per request" translate="no">​</a></h2>
+<p>Whisper transcription: ~60s for 5min video. Scene detection: ~30s. Runs on every cut request.</p>
+<p>People want multiple clips from the same video. Transcribing the same video 5 times = 5 minutes wasted.</p>
+<p>Added basic caching with video file hashes. First cut takes 90s, subsequent cuts from same video take 0.2s. Just stores the analysis results in <code>.video_cache/</code>.</p>
+<div class="language-python codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-python codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">pipeline </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> FastPreprocessingPipeline</span><span class="token punctuation" style="color:#393A34">(</span><span class="token plain">use_cache</span><span class="token operator" style="color:#393A34">=</span><span class="token boolean" style="color:#36acaa">True</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">analysis </span><span class="token operator" style="color:#393A34">=</span><span class="token plain"> pipeline</span><span class="token punctuation" style="color:#393A34">.</span><span class="token plain">preprocess_video</span><span class="token punctuation" style="color:#393A34">(</span><span class="token string" style="color:#e3116c">"video.mp4"</span><span class="token punctuation" style="color:#393A34">)</span><span class="token plain">  </span><span class="token comment" style="color:#999988;font-style:italic"># Slow first time, instant after</span><br></span></code></pre></div></div>
+<p>Should've done this from day one.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="integration-is-80-of-the-work">Integration is 80% of the work<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#integration-is-80-of-the-work" class="hash-link" aria-label="Direct link to Integration is 80% of the work" title="Direct link to Integration is 80% of the work" translate="no">​</a></h2>
+<p>Individual pieces are straightforward:</p>
+<ul>
+<li>Whisper gives word timestamps</li>
+<li>OpenCV detects scene changes</li>
+<li>Optical flow tracks motion</li>
+<li>MediaPipe finds faces/blinks</li>
+<li>Librosa analyzes audio</li>
+</ul>
+<p>Making them work together without contradicting each other is some interesting job which I am still figuring out.</p>
+<p>Had to add a validation layer that checks if the selected range:</p>
+<ul>
+<li>Has complete sentences (not cut mid-thought)</li>
+<li>Doesn't have jarring visual jumps</li>
+<li>Maintains topic coherence</li>
+<li>Has stable audio (no clipping)</li>
+</ul>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="whats-broken-right-now">What's broken right now<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#whats-broken-right-now" class="hash-link" aria-label="Direct link to What's broken right now" title="Direct link to What's broken right now" translate="no">​</a></h2>
+<p>Face detection in "full" mode takes forever. Like 70% of total processing time. Need to profile this.</p>
+<p>Semantic analysis doesn't actually detect topic boundaries well. Using basic sentence embeddings but they're not good enough. Might need to try a different approach or just remove this feature.</p>
+<p>Error messages are terrible. When the system can't find a good cut point it just says "Priority 2 failed" which means nothing to users.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="stuff-that-actually-helped">Stuff that actually helped<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#stuff-that-actually-helped" class="hash-link" aria-label="Direct link to Stuff that actually helped" title="Direct link to Stuff that actually helped" translate="no">​</a></h2>
+<p>Whisper's tiny model works better than expected. Word-level timestamps are pretty accurate even with background noise and is fast enough. Might be because we are focusing on talking head/podcast videos.</p>
+<p>Cyclopts for CLI was good. Better than argparse, handles nested commands cleanly.</p>
+<p>PySceneDetect saved time. Didn't have to write scene detection from scratch.</p>
+<p>MediaPipe face detection works but is slow. Might need to sample frames instead of processing every single one.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="what-i-shouldve-done-differently">What I should've done differently<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#what-i-shouldve-done-differently" class="hash-link" aria-label="Direct link to What I should've done differently" title="Direct link to What I should've done differently" translate="no">​</a></h2>
+<p>Should've built the CLI interface first. Forces you to think about actual usage before implementation.</p>
+<p>Should've started with the simplest possible version - just find pauses and cut there. Then add complexity. Instead I went straight to "multi-modal AI fusion" which took hours.</p>
+<p>Should've added batch evaluation for accuracy testing from the start. Added it late and it's now one of the most useful features.</p>
+<p>Should've added way more logging. When a cut looks wrong I have no idea why the system chose it. About to do it next week.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="random-win">Random win<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#random-win" class="hash-link" aria-label="Direct link to Random win" title="Direct link to Random win" translate="no">​</a></h2>
+<p>The batch evaluation system (process multiple videos, generate accuracy reports) wasn't even planned. Built it for testing. Turns out it's really useful for seeing how the system performs across different video types.</p>
+<p>Sometimes the tools you build to test your code end up being features.</p>
+<h2 class="anchor anchorWithStickyNavbar_LWe7" id="next-steps">Next steps<a href="https://blog.vertexcover.io/learnings/2025/01/20/ai-video-cutter-week1#next-steps" class="hash-link" aria-label="Direct link to Next steps" title="Direct link to Next steps" translate="no">​</a></h2>
+<p>Need to fix face detection performance. Probably sampling frames instead of processing all of them.</p>
+<p>Semantic analysis either needs better models or needs to be removed.</p>
+<p>Better error messages so people know why a cut point was chosen or why it failed.</p>
+<p>Add logging with jsonl and try to visualize each filter as to how they reject/accept a frame.</p>]]></content>
+        <author>
+            <name>Aman Kumar Singh</name>
+            <uri>https://github.com/amankumarsingh77</uri>
+        </author>
+        <category label="video-processing" term="video-processing"/>
+        <category label="video clips" term="video clips"/>
+        <category label="video cuts" term="video cuts"/>
+        <category label="whisper" term="whisper"/>
+        <category label="python" term="python"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[Example Daily Learning]]></title>
         <id>https://blog.vertexcover.io/learnings/2025/01/15/example-learning</id>

@@ -1,1 +1,0 @@
-"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[9971],{4240:e=>{e.exports=JSON.parse('{"tags":[{"label":"typescript","permalink":"/learnings/tags/typescript","count":1},{"label":"performance","permalink":"/learnings/tags/performance","count":1}]}')}}]);

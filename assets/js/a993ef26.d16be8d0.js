@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[1372],{8730:e=>{e.exports=JSON.parse('{"metadata":{"permalink":"/learnings","page":1,"postsPerPage":10,"totalPages":1,"totalCount":3,"blogDescription":"Weekly learnings from the Vertexcover team","blogTitle":"Learnings"}}')}}]);
