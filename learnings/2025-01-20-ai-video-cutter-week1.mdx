@@ -1,0 +1,117 @@
+---
+title: "AI Video Cutter - Week 1 Learnings"
+date: 2025-01-20
+type: weekly
+authors: [aksdev]
+tags: [video-processing, video clips, video cuts, whisper, python]
+---
+
+# AI Video Cutter - Week 1 Learnings
+
+Been working on this video cutting tool that uses AI to find optimal cut points. Some things worked, some things I had to completely rewrite. Here's what went down.
+
+{/* truncate */}
+
+## Misunderstood the problem statement
+
+Built this whole `find_optimal_cut_point()` function that finds the optimal cutpoint in a video considering the Start point and End Point given by the user. Used Whisper for speech detection, OpenCV for scene changes, added motion analysis. Worked great.
+
+Problem: Understood the problem statement wrong. It was "Find the optimal frame to cut near the timestamp that the user gives". Which means that the user already knows where to cut but is not precise at a frame level, So we just ask for the estimated timestamp and then look around to find the best frame to cut.
+
+Learnings : Always clarify the problem statement by repeating it to the person. So you both are on the same page.
+
+## Weighted scoring doesn't work for hard constraints
+
+First version used a points system: sentence boundary +40pts, pause +30pts, scene change +30pts, etc. Add them up, pick highest score.
+
+Bug: System kept cutting mid-word because a scene change (30pts) + low motion (20pts) outscored a sentence boundary (40pts) by itself.
+
+Realized some rules aren't negotiable. You literally cannot cut while someone is speaking. It's not a preference, it's a constraint.
+
+Rewrote to use strict priority filtering:
+
+```python
+# Priority 1: Remove all frames mid-speech (absolute)
+# Priority 2: Remove frames with motion > 2.5 (strict)  
+# Priority 3: Remove frames with blinks/open mouth (best effort)
+```
+
+Each filter runs sequentially. If all frames fail a priority, fallback to previous level. This will be changed as if there are no frames left after filtering then its not a good range to extract any cut point.
+
+If you catch yourself using weighted scoring to "compensate" for bad choices, you probably need filters instead.
+
+## Caching saves 90 seconds per request
+
+Whisper transcription: ~60s for 5min video. Scene detection: ~30s. Runs on every cut request.
+
+People want multiple clips from the same video. Transcribing the same video 5 times = 5 minutes wasted.
+
+Added basic caching with video file hashes. First cut takes 90s, subsequent cuts from same video take 0.2s. Just stores the analysis results in `.video_cache/`.
+
+```python
+pipeline = FastPreprocessingPipeline(use_cache=True)
+analysis = pipeline.preprocess_video("video.mp4")  # Slow first time, instant after
+```
+
+Should've done this from day one.
+
+## Integration is 80% of the work
+
+Individual pieces are straightforward:
+- Whisper gives word timestamps
+- OpenCV detects scene changes
+- Optical flow tracks motion
+- MediaPipe finds faces/blinks
+- Librosa analyzes audio
+
+Making them work together without contradicting each other is some interesting job which I am still figuring out.
+
+Had to add a validation layer that checks if the selected range:
+- Has complete sentences (not cut mid-thought)
+- Doesn't have jarring visual jumps
+- Maintains topic coherence
+- Has stable audio (no clipping)
+
+## What's broken right now
+
+Face detection in "full" mode takes forever. Like 70% of total processing time. Need to profile this.
+
+Semantic analysis doesn't actually detect topic boundaries well. Using basic sentence embeddings but they're not good enough. Might need to try a different approach or just remove this feature.
+
+Error messages are terrible. When the system can't find a good cut point it just says "Priority 2 failed" which means nothing to users.
+
+## Stuff that actually helped
+
+Whisper's tiny model works better than expected. Word-level timestamps are pretty accurate even with background noise and is fast enough. Might be because we are focusing on talking head/podcast videos.
+
+Cyclopts for CLI was good. Better than argparse, handles nested commands cleanly.
+
+PySceneDetect saved time. Didn't have to write scene detection from scratch.
+
+MediaPipe face detection works but is slow. Might need to sample frames instead of processing every single one.
+
+## What I should've done differently
+
+Should've built the CLI interface first. Forces you to think about actual usage before implementation.
+
+Should've started with the simplest possible version - just find pauses and cut there. Then add complexity. Instead I went straight to "multi-modal AI fusion" which took hours.
+
+Should've added batch evaluation for accuracy testing from the start. Added it late and it's now one of the most useful features.
+
+Should've added way more logging. When a cut looks wrong I have no idea why the system chose it. About to do it next week.
+
+## Random win
+
+The batch evaluation system (process multiple videos, generate accuracy reports) wasn't even planned. Built it for testing. Turns out it's really useful for seeing how the system performs across different video types.
+
+Sometimes the tools you build to test your code end up being features.
+
+## Next steps
+
+Need to fix face detection performance. Probably sampling frames instead of processing all of them.
+
+Semantic analysis either needs better models or needs to be removed.
+
+Better error messages so people know why a cut point was chosen or why it failed.
+
+Add logging with jsonl and try to visualize each filter as to how they reject/accept a frame.
