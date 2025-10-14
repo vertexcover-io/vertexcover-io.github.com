@@ -1,3 +1,14 @@
+
+ranjan:
+  name: Ranjan Ojha
+  title: Software Engineer
+  url: https://github.com/hungerarray
+  image_url: https://github.com/hungerarray.png
+  page: true
+  socials:
+    github: hungerarray
+    linkedin: ojha-ranjan
+
 abeeshake:
   name: Abhishek Tripathi
   title: Curiosity brings awareness.
