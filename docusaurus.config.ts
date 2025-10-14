@@ -22,6 +22,7 @@ const config: Config = {
         id: 'learnings',
         routeBasePath: 'learnings',
         path: './learnings',
+        authorsMapPath: '../blog/authors.yml',
         blogTitle: 'Learnings',
         blogDescription: 'Weekly learnings from the Vertexcover team',
         blogSidebarTitle: 'All learnings',
