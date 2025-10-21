@@ -39,15 +39,15 @@ Instead of asking "does this frame pass?", we now ask "which frame is best?". Th
 
 The ranker combines 5 key metrics with configurable weights:
 
-1. **Eye Openness (30%)** - Uses Eye Aspect Ratio (EAR) detection based on Soukupová & Čech (2016). We want eyes fully open, not blinking or partially closed.
+1. **Eye Openness** - Uses Eye Aspect Ratio (EAR) detection based on Soukupová & Čech (2016). We want eyes fully open, not blinking or partially closed.
 
-2. **Motion Stability (25%)** - Uses Farneback optical flow to measure frame-to-frame motion. Lower motion is better (inverse scoring).
+2. **Motion Stability** - Uses Farneback optical flow to measure frame-to-frame motion. Lower motion is better (inverse scoring).
 
-3. **Expression Neutrality (20%)** - Analyzes MediaPipe facial blendshapes to detect mouth movement and eyebrow activity. We prefer neutral expressions (inverse scoring).
+3. **Expression Neutrality** - Analyzes MediaPipe facial blendshapes to detect mouth movement and eyebrow activity. We prefer neutral expressions (inverse scoring).
 
-4. **Pose Stability (15%)** - Measures head pose deviation from neutral position. Stable head position is better (inverse scoring).
+4. **Pose Stability** - Measures head pose deviation from neutral position. Stable head position is better (inverse scoring).
 
-5. **Visual Sharpness (10%)** - Laplacian variance to ensure the frame isn't blurry.
+5. **Visual Sharpness** - Laplacian variance to ensure the frame isn't blurry.
 
 The beauty of weighted scoring is that it allows trade-offs. A frame with perfect eye openness but slightly higher motion can still score well, whereas with thresholds it might have been rejected entirely.
 
