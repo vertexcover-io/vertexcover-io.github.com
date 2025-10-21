@@ -1,0 +1,101 @@
+---
+title: "AI Video Cutter - Week 2 Learnings"
+date: 2025-10-21
+type: weekly
+authors: [aksdev]
+tags: [video-processing, video clips, video cuts, python]
+---
+
+- [Why Thresholding Approach Doesn't Work Well](#why-thresholding-approach-doesnt-work-well)
+- [Moving to a Pure Ranking Algorithm](#moving-to-a-pure-ranking-algorithm)
+  - [Multi-Factor Scoring System](#multi-factor-scoring-system)
+  - [Multi-Stage Ranking Pipeline](#multi-stage-ranking-pipeline)
+  - [Temporal Diversity Filtering](#temporal-diversity-filtering)
+- [Research-Based Feature Extraction](#research-based-feature-extraction)
+- [Word-Level Pause Detection](#word-level-pause-detection)
+- [References and Resources](#references-and-resources)
+
+{/* truncate */}
+
+# Why Thresholding Approach Doesn't Work Well
+
+The original approach relied heavily on fixed thresholds to determine whether a frame was suitable for cutting. For example, we would check if motion was below 2.5 pixels/frame, or if mouth openness was below 0.08 aspect ratio. While this seemed reasonable in theory, several fundamental issues emerged:
+
+**The Binary Decision Problem**: Thresholds create hard boundaries - a frame with motion at 2.4 is "good" while one at 2.6 is "bad". This ignores the fact that quality exists on a spectrum. We were discarding potentially excellent cut points simply because one metric was slightly above threshold, even if all other metrics were perfect.
+
+**The Context Blindness Problem**: A threshold of 2.5 pixels/frame might be perfectly fine for one video but completely wrong for another. A talking head video shot on a stabilized camera will have very different motion characteristics than one shot handheld. The threshold approach had no way to understand relative quality within a video's context.
+
+**The Combinatorial Explosion Problem**: With 5+ metrics (eye openness, motion, expression, pose, sharpness), we faced an impossible tuning challenge. What if a frame had excellent eye openness and stability but slightly high motion? Which threshold should win? We ended up with increasingly complex boolean logic that was brittle and hard to reason about.
+
+**The "No Good Frame" Scenario**: In some video segments, no frame passed all thresholds. The system would then either fail completely or pick arbitrarily, defeating the purpose of quality analysis. The threshold approach couldn't say "this frame is better than that one" - it could only say "pass" or "fail".
+
+These limitations made it clear that we needed a fundamentally different approach that could handle relative quality, context-awareness, and graceful degradation.
+
+# Moving to a Pure Ranking Algorithm
+
+Instead of asking "does this frame pass?", we now ask "which frame is best?". The ranking algorithm in `try/cut_point_ranker/` implements a pure ranking approach with no thresholds whatsoever. Every frame gets scored, and we simply pick the highest-ranked ones.
+
+## Multi-Factor Scoring System
+
+The ranker combines 5 key metrics with configurable weights:
+
+1. **Eye Openness (30%)** - Uses Eye Aspect Ratio (EAR) detection based on Soukupová & Čech (2016). We want eyes fully open, not blinking or partially closed.
+
+2. **Motion Stability (25%)** - Uses Farneback optical flow to measure frame-to-frame motion. Lower motion is better (inverse scoring).
+
+3. **Expression Neutrality (20%)** - Analyzes MediaPipe facial blendshapes to detect mouth movement and eyebrow activity. We prefer neutral expressions (inverse scoring).
+
+4. **Pose Stability (15%)** - Measures head pose deviation from neutral position. Stable head position is better (inverse scoring).
+
+5. **Visual Sharpness (10%)** - Laplacian variance to ensure the frame isn't blurry.
+
+The beauty of weighted scoring is that it allows trade-offs. A frame with perfect eye openness but slightly higher motion can still score well, whereas with thresholds it might have been rejected entirely.
+
+## Multi-Stage Ranking Pipeline
+
+The scoring happens in multiple stages to ensure quality:
+
+**Stage 1: Feature Extraction** - Extract all raw metrics from every frame in the time range. This is done in a single pass through the video for efficiency.
+
+**Stage 2: Normalization** - Normalize all metrics to [0, 1] range across the entire segment. This is crucial - the normalization happens relative to the video segment being analyzed, making it context-aware.
+
+**Stage 3: Quality Gating** - Instead of hard thresholds, we use percentile-based penalties. If a frame's expression activity is above the 75th percentile for the segment, it receives a penalty multiplier. The penalty is proportional to how extreme the outlier is, not a binary yes/no.
+
+**Stage 4: Local Stability Boost** - Frames that are part of stable sequences (low variance in a 5-frame window) receive a boost multiplier. This rewards temporal coherence.
+
+**Stage 5: Context Window Smoothing** - Apply a sliding window average over composite scores. A frame is better if its neighbors are also good, ensuring we don't pick an isolated good frame in a bad sequence.
+
+# Research-Based Feature Extraction
+
+Rather than inventing metrics from scratch, the implementation uses proven computer vision algorithms:
+
+- **Eye Aspect Ratio (EAR)**: Based on the 2016 paper by Soukupová & Čech for blink detection. Calculates ratio of vertical to horizontal eye landmark distances.
+
+- **Optical Flow**: Uses Farneback dense optical flow, a well-established method for motion estimation in video.
+
+- **MediaPipe FaceMesh**: Google's solution providing 478 facial landmarks plus 52 blendshape coefficients for detailed expression analysis.
+
+- **Laplacian Variance**: Standard technique for measuring image sharpness by analyzing high-frequency content.
+
+# Word-Level Pause Detection
+
+Improved the speech analysis to detect pauses at word-level granularity rather than just sentence boundaries. This allows us to find natural cut points mid-sentence during natural speaking pauses, which is especially important for AI-generated talking head videos where sentences can be quite long.
+
+The transcription analysis now tracks word-level timestamps and identifies pauses between words that are long enough to indicate a natural break in speech flow.
+
+# Adaptive Padding for Cut Points
+
+Implemented an adaptive padding calculator that analyzes visual stability around a cut point to determine optimal padding amounts. Instead of fixed padding values, the system now:
+
+- Analyzes frame similarity before/after the cut point
+- Measures face movement and general motion
+- Detects scene changes that would affect padding needs
+
+This ensures we add just enough padding for smooth transitions without including unstable or transitional frames, with padding amounts ranging from configured minimum to maximum based on actual video content stability.
+
+# References and Resources
+
+- **Eye Aspect Ratio (EAR)**: [Real-Time Eye Blink Detection using Facial Landmarks](http://vision.fe.uni-lj.si/cvww2016/proceedings/papers/05.pdf)
+- **Farneback Optical Flow**: [Two-Frame Motion Estimation Based on Polynomial Expansion](http://www.diva-portal.org/smash/get/diva2:273847/FULLTEXT01.pdf)
+- **MediaPipe FaceMesh**: [Official Documentation](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker)
+- **Laplacian Variance**: [PyImageSearch Blur Detection Tutorial](https://pyimagesearch.com/2015/09/07/blur-detection-with-opencv/)
