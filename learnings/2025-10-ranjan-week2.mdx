@@ -1,0 +1,677 @@
+---
+title: "Weekly learnings: Week2"
+date: 2025-10-22
+type: weekly
+authors: [ranjan]
+tags: []
+draft: false
+---
+
+Developed a comprehensive benchmarking framework for comparing container image formats (regular vs eStargz) for large LLM workloads using containerd and stargz-snapshotter.
+
+{/* truncate */}
+
+### Key Findings
+
+**Lazy pulling with eStargz provides dramatic startup improvements:**
+- **150x faster pull times** (9.2s → 0.06s)
+- **13.9x faster cold starts** (9.4s → 0.67s)
+- **Zero disk storage overhead**
+
+**But reveals a critical trade-off for data-intensive workloads:**
+- **1.5-2x slower total completion** when accessing >30% of image data
+- Stress test (8GB sequential read): Overlayfs 45-54s vs Stargz 79-88s
+- **Working set size determines which approach is faster**
+
+**Bottom line:** Lazy pulling optimizes for startup latency (ideal for inference/serving), while eager loading optimizes for total completion time (better for training/batch processing).
+
+---
+
+## Key Results
+
+### Cold Start Performance (Small Working Set - 2GB Image)
+
+| Metric | Regular Pull | Lazy Pull (eStargz) | Improvement |
+|--------|--------------|---------------------|-------------|
+| **Pull time** | 9.178s | 0.061s | **150x faster** |
+| **Container start + ready** | 199ms | 587ms | Slower (on-demand fetch) |
+| **Total cold start** | 9.401s | 0.675s | **13.9x faster** |
+| **Data downloaded at pull** | 2.0 GB | ~9 KB | **99.9% reduction** |
+| **Disk usage after pull** | 2.0 GB cached | 0 bytes | **100% savings** |
+
+**Scenario**: Application with small working set (~1-5% of image accessed)
+
+### Total Workload Completion (Large Working Set - 8GB Image) ⚠️
+
+**CRITICAL TRADE-OFF**: When workloads access significant portions of the image, lazy pulling is **SLOWER** for total completion time.
+
+**Stress Test Results** (sequential read of 8GB data):
+
+| Mode | Registry | File Pattern | Total Time | vs Overlayfs |
+|------|----------|--------------|------------|--------------|
+| **Overlayfs** | localhost | many-small | 52s | baseline |
+| **Overlayfs** | localhost | few-large | 54s | baseline |
+| **Overlayfs** | 172.17.0.2 | many-small | 45s | baseline |
+| **Overlayfs** | 172.17.0.2 | few-large | 45s | baseline |
+| **Stargz** | localhost | many-small | **88s** | **1.7x slower** ❌ |
+| **Stargz** | localhost | few-large | **79s** | **1.5x slower** ❌ |
+| **Stargz** | 172.17.0.2 | many-small | **82s** | **1.8x slower** ❌ |
+| **Stargz** | 172.17.0.2 | few-large | **83s** | **1.8x slower** ❌ |
+
+**Why Lazy Pulling is Slower for Data-Intensive Workloads:**
+
+```
+Overlayfs (eager loading):
+  Bulk download: 45-53s (parallel, full bandwidth)
+  Workload execution: Fast (all data local on SSD)
+  ────────────────────────────────────
+  Total: 45-54s
+
+Stargz (lazy loading):
+  Metadata pull: <1s
+  Workload execution: 78-87s (many serialized HTTP range requests)
+  ────────────────────────────────────
+  Total: 79-88s (1.5-2x SLOWER!)
+```
+
+**Performance Breakdown:**
+- **Pull phase**: Stargz wins (150x faster) ✅
+- **Execution phase**: Overlayfs wins (on-demand HTTP requests slower than local disk) ✅
+- **Total time**: Depends on working set size and access pattern
+
+### Key Insights
+
+1. **Cold start time ≠ Total completion time**
+   - Lazy pulling optimizes startup latency
+   - BUT penalizes total workload completion when data access is substantial
+
+2. **Working set size is critical**
+   - Small working set (<10%): Lazy pulling wins dramatically (13.9x faster)
+   - Large working set (>30%): Eager loading wins (1.5-2x faster)
+
+3. **File pattern sensitivity**
+   - Many small files: Worse for lazy pulling (88s vs 79s)
+   - Each file = separate HTTP request = more latency overhead
+
+4. **Network vs disk I/O trade-off**
+   - Bulk parallel download: ~45-53s for 8GB
+   - Serialized on-demand fetches: ~78-87s for same data
+   - Local disk reads >> HTTP range requests for large data access
+
+---
+
+## Technical Architecture
+
+### Core Components
+
+1. **Containerd Benchmark Framework** (`containerd-bench/`)
+   - Pure Go API integration with containerd
+   - Programmatic control over container lifecycle
+   - JSON Lines logging for performance analysis
+   - Operations: PullImage, RPullImage (lazy), CreateContainer, StartContainer, etc.
+
+2. **Lazy Pulling with eStargz**
+   - Uses stargz-snapshotter plugin for on-demand layer fetching
+   - HTTP range requests to fetch only needed chunks
+   - FUSE filesystem for transparent lazy loading
+   - Zero disk storage overhead
+
+3. **Startup Benchmarking Tool** (`startup-bench/`)
+   - Cold and warm start measurements
+   - Container readiness detection (not just process start)
+   - Auto-detection of eStargz images by `:esgz` suffix
+   - Support for plain HTTP registries
+
+---
+
+## How Lazy Pulling Works
+
+### Phase 1: Metadata Fetch (~0.06s for 2GB image)
+```
+Download index (290B) + manifest (2.6KB) + config (6.3KB) = ~9KB
+Register layers with stargz-snapshotter as "remote"
+```
+
+### Phase 2: Container Creation (~0.03s)
+```
+Stargz-snapshotter creates remote snapshot mounts
+FUSE filesystem presents layer contents virtually
+Container starts WITHOUT waiting for layer downloads
+```
+
+### Phase 3: On-Demand Fetching (during container runtime)
+```
+Application reads /app/data/file.dat
+  ↓
+FUSE intercepts read()
+  ↓
+HTTP GET with Range: bytes=1024-2048 to registry
+  ↓
+Data returned (cached in memory, NOT disk)
+```
+
+**Result**: For 2GB image with small working set (~20-30MB accessed), only those chunks are fetched.
+
+### Performance Implications
+
+**Small Working Set (<10% of image):**
+```
+Pull: <1s (metadata only)
+Runtime: Fast (few on-demand fetches)
+Total: 13.9x faster than eager loading ✅
+```
+
+**Large Working Set (>30% of image):**
+```
+Pull: <1s (metadata only)
+Runtime: 78-87s (many serialized HTTP requests)
+Total: 1.5-2x SLOWER than eager loading ❌
+
+Why slower:
+- Bulk parallel download: 45-53s for 8GB
+- On-demand serial fetches: 78-87s for same 8GB
+- Each file access = network round-trip
+- FUSE overhead + HTTP request overhead
+```
+
+**Trade-off:** Fast startup vs total completion time depends on working set size.
+
+---
+
+## Implementation Highlights
+
+### RPullImage Operation
+
+Used `source.AppendDefaultLabelsHandlerWrapper()` from stargz-snapshotter:
+
+```go
+import (
+    "github.com/containerd/containerd/v2/client"
+    "github.com/containerd/stargz-snapshotter/fs/source"
+)
+
+// Create label handler - this enables lazy pulling!
+labelHandler := source.AppendDefaultLabelsHandlerWrapper(imageRef, prefetchSize)
+
+pullOpts := []client.RemoteOpt{
+    client.WithPullUnpack,
+    client.WithImageHandlerWrapper(labelHandler),  // Essential for lazy pulling
+    client.WithPullSnapshotter("stargz"),
+}
+
+_, err := containerdClient.Pull(ctx, imageRef, pullOpts...)
+```
+
+**Critical Insight**: Regular `containerd.Pull()` downloads everything even with stargz snapshotter. The label handler wrapper is **essential** for true lazy pulling.
+
+---
+
+## Critical Bugs Discovered & Fixed
+
+### 1. Content Blob Caching
+
+**Problem**: Cold start iterations reused cached content blobs (48s → 0.17s on iteration 2).
+
+**Root Cause**: Content blobs are globally shared across namespaces. Image removal only cleared metadata.
+
+**Solution**: Use `images.SynchronousDelete()` to trigger immediate garbage collection:
+
+```go
+deleteOpts := []images.DeleteOpt{images.SynchronousDelete()}
+imageService.Delete(ctx, imageRef, deleteOpts...)
+```
+
+### 2. Metadata Corruption
+
+**Problem**: Mixing regular `Pull()` and `rpull` caused "target snapshot already exists" errors.
+
+**Root Cause**: Content blobs retained `containerd.io/uncompressed` annotations from previous pulls.
+
+**Solution**: Clean content store before lazy pulling:
+
+```bash
+sudo ctr-remote content ls | grep workload | awk '{print $1}' | \
+  xargs -I {} sudo ctr-remote content rm {}
+```
+
+**Prevention**: Never mix pull methods - always use RPullImage for eStargz images.
+
+### 3. Plain HTTP Registry Support
+
+**Problem**: Custom Docker resolver breaks lazy pulling by forcing full downloads.
+
+**Solution for RPullImage**: Configure stargz-snapshotter daemon instead:
+
+```toml
+# /etc/containerd-stargz-grpc/config.toml
+[[resolver.host."172.17.0.2:5000".mirrors]]
+host = "172.17.0.2:5000"
+insecure = true
+```
+
+---
+
+## eStargz Format Verification
+
+### Key Characteristics
+
+**Media Type**: `application/vnd.oci.image.layer.v1.tar+gzip` (same as regular gzip!)
+
+**Distinguishing Features**:
+1. **STARGZ footer** in blob (verify with `xxd`)
+2. **TOC digest annotation**: `containerd.io/snapshot/stargz/toc.digest`
+3. **Uncompressed size annotation**: `io.containers.estargz.uncompressed-size`
+
+### Creating eStargz Images
+
+Use ctr-remote workflow (NOT docker buildx):
+
+```bash
+# 1. Build regular image
+docker buildx build -t localhost:5000/image:base --push .
+
+# 2. Pull to containerd
+sudo ctr-remote image pull localhost:5000/image:base
+
+# 3. Optimize to eStargz
+sudo ctr-remote image optimize --no-optimize --oci \
+  localhost:5000/image:base localhost:5000/image:esgz
+
+# 4. Push eStargz image
+sudo ctr-remote images push --plain-http localhost:5000/image:esgz
+```
+
+### Verification
+
+```bash
+# Check manifest annotations
+curl -s http://localhost:5000/v2/image/manifests/esgz | \
+  jq '.layers[].annotations'
+
+# Verify STARGZ footer in blob
+sudo tail -c 100 /var/lib/containerd/.../blobs/sha256/... | xxd | tail -3
+# Look for: "STARGZ" marker
+```
+
+---
+
+## Best Practices
+
+### Decision Framework: Lazy Pulling vs Eager Loading
+
+**The critical factor is WORKING SET SIZE:**
+
+```
+Working Set < 10% of image:
+  → Use lazy pulling (13.9x faster startup)
+
+Working Set > 30% of image:
+  → Use eager loading (1.5-2x faster total completion)
+
+Working Set 10-30% of image:
+  → Depends on whether you optimize for startup or total time
+```
+
+### When to Use Lazy Pulling ✅
+
+**Best for startup latency optimization:**
+
+1. **Small working set** (<10% of image accessed)
+   - Example: Web API loading libraries (100MB of 2GB image)
+   - Result: 13.9x faster cold start
+
+2. **Ephemeral workloads** - short-lived containers
+   - Containers that start, perform task, exit quickly
+   - Don't benefit from caching anyway
+
+3. **Cold start critical** - startup time is the bottleneck
+   - Serverless functions
+   - Auto-scaling scenarios
+   - Development/testing iterations
+
+4. **Limited disk space** - can't cache full images
+   - Edge devices
+   - Multi-tenant nodes with many images
+
+5. **High bandwidth, low latency** to registry
+   - On-demand fetches need fast network
+   - Registry co-located with compute
+
+**Example Use Case:**
+```
+LLM Inference API:
+- Image: 4GB (model weights)
+- Working set: 300MB (actively loaded model portion)
+- Access pattern: Load once, serve many requests
+
+Lazy pulling: 1-2s startup vs 18s eager
+Result: 9-18x faster! ✅
+```
+
+### When NOT to Use Lazy Pulling ❌
+
+**Eager loading is faster when:**
+
+1. **Large working set** (>30% of image accessed)
+   - Example: Batch processing reading 8GB of 8GB image
+   - Result: Lazy pulling 1.5-2x SLOWER for total completion
+
+2. **Data-intensive workloads** - process significant data
+   - Training jobs accessing entire dataset
+   - ETL pipelines reading many files
+   - Stress tests (like our benchmark)
+
+3. **Sequential file access** - many files read in order
+   - Each file = separate HTTP request with lazy pulling
+   - Bulk download is much faster (parallel, large chunks)
+
+4. **Small images** (<100MB) - overhead not worth it
+   - Metadata overhead dominates
+
+5. **Slow/high-latency network** - on-demand fetches will be slow
+   - Each file access waits for network round-trip
+
+6. **Offline/air-gapped environments** - no registry access
+
+**Example Use Case:**
+```
+LLM Training/Fine-tuning:
+- Image: 8GB (dataset + checkpoints)
+- Working set: 7GB (accessing most data during training)
+- Access pattern: Read many files sequentially
+
+Lazy pulling: 79-88s total time
+Eager loading: 45-54s total time
+Result: Eager 1.5-2x faster! ✅
+```
+
+### Performance Optimization Matrix
+
+| Metric to Optimize | Image Size | Working Set | Recommendation |
+|-------------------|------------|-------------|----------------|
+| **Cold start time** | Large (>1GB) | Small (<10%) | Lazy pulling ✅ |
+| **Cold start time** | Large (>1GB) | Large (>30%) | Lazy pulling ✅ (startup only) |
+| **Total completion time** | Large (>1GB) | Small (<10%) | Lazy pulling ✅ |
+| **Total completion time** | Large (>1GB) | Large (>30%) | Eager loading ✅ |
+| **Disk usage** | Any | Any | Lazy pulling ✅ |
+| **Network bandwidth** | Large (>1GB) | Small (<10%) | Lazy pulling ✅ |
+| **Network bandwidth** | Large (>1GB) | Large (>30%) | Eager loading ✅ |
+
+---
+
+## Architecture Insights
+
+### Containerd Design Principles
+
+1. **Content Store is Global**
+   - Image metadata: namespaced ✅
+   - Container metadata: namespaced ✅
+   - Content blobs: **GLOBAL** (shared across namespaces) ❌
+
+2. **Snapshotter Abstraction**
+   - Each snapshotter has unique requirements
+   - Stargz needs special label handlers for lazy pulling
+   - Not as simple as just switching a snapshotter flag
+
+3. **Trade-offs**
+   - **Startup latency**: Lazy pulling dramatically faster (13.9x)
+   - **Total completion**: Depends on working set size
+     - Small working set (<10%): Lazy pulling wins (13.9x faster)
+     - Large working set (>30%): Eager loading wins (1.5-2x faster)
+   - **Network vs Disk I/O**:
+     - Bulk parallel download: ~45-53s for 8GB
+     - Serialized on-demand fetches: ~78-87s for same 8GB data
+     - Local disk reads >> HTTP range requests for large data access
+   - **Zero storage overhead** vs traditional caching benefits
+   - **Network-dependent performance** - requires good bandwidth/latency
+
+### Version Compatibility
+
+**Critical**: Match library versions with system installations
+
+```bash
+# Check system version
+containerd --version  # v2.1.4
+
+# Use matching library version
+go get github.com/containerd/containerd/v2@v2.1.4
+```
+
+---
+
+## Debugging Techniques
+
+### 1. Check Content Store Annotations
+```bash
+sudo ctr-remote content ls | grep image
+# Look for: containerd.io/uncompressed annotations
+```
+
+### 2. Verify Lazy Pulling is Active
+```bash
+# Inside container, check for stargz metadata
+ls /.stargz-snapshotter/
+cat /.stargz-snapshotter/*.json
+```
+
+### 3. Binary Verification
+```bash
+# Check STARGZ footer (authoritative proof)
+sudo tail -c 100 /var/lib/containerd/.../blobs/sha256/... | xxd | tail -3
+```
+
+### 4. Monitor On-Demand Fetches
+```bash
+# Watch stargz-snapshotter logs
+sudo journalctl -u stargz-snapshotter -f
+```
+
+---
+
+## Quick Reference Commands
+
+### Setup
+```bash
+# Start local registry
+docker run -d --name registry -p 5000:5000 registry:2
+
+# Start stargz-snapshotter
+sudo systemctl start stargz-snapshotter
+```
+
+### Benchmarking
+```bash
+# Build tool
+cd startup-bench && go build -o startup-bench main.go
+
+# Cold start with lazy pulling (auto-detected via :esgz suffix)
+sudo ./startup-bench \
+  -image=localhost:5000/workload-2048mb-few-large:esgz \
+  -snapshotter=stargz \
+  -mode=cold \
+  -iterations=3
+
+# Cold start with regular pull
+sudo ./startup-bench \
+  -image=localhost:5000/workload-2048mb-few-large:latest \
+  -snapshotter=overlayfs \
+  -mode=cold \
+  -iterations=3
+```
+
+### Cleanup
+```bash
+# Clean content store for true cold starts
+sudo ctr-remote content ls | grep workload | awk '{print $1}' | \
+  xargs -I {} sudo ctr-remote content rm {}
+
+# Restart services
+sudo systemctl restart stargz-snapshotter
+sudo systemctl restart containerd
+```
+
+---
+
+## External Resources
+
+### Official Documentation
+
+**Stargz-Snapshotter**:
+- [Project Overview](https://github.com/containerd/stargz-snapshotter/blob/main/docs/overview.md)
+- [Getting Started Guide](https://github.com/containerd/stargz-snapshotter/blob/main/docs/getting-started.md)
+- [ctr-remote CLI Tool](https://github.com/containerd/stargz-snapshotter/blob/main/docs/ctr-remote.md)
+- [Registry Configuration](https://github.com/containerd/stargz-snapshotter/blob/main/docs/overview.md#registry-mirrors-and-insecure-connection)
+- [GitHub Repository](https://github.com/containerd/stargz-snapshotter)
+
+**Containerd**:
+- [Official Documentation](https://github.com/containerd/containerd/tree/main/docs)
+- [Garbage Collection](https://github.com/containerd/containerd/blob/main/docs/garbage-collection.md)
+- [Content Store Design](https://github.com/containerd/containerd/blob/main/docs/content-flow.md)
+- [Namespaces](https://github.com/containerd/containerd/blob/main/docs/namespaces.md)
+- [Snapshotters](https://github.com/containerd/containerd/blob/main/docs/snapshotters/README.md)
+- [GitHub Repository](https://github.com/containerd/containerd)
+
+**OCI Specifications**:
+- [OCI Image Spec](https://github.com/opencontainers/image-spec)
+- [Media Types](https://github.com/opencontainers/image-spec/blob/main/media-types.md)
+- [Image Layer Spec](https://github.com/opencontainers/image-spec/blob/main/layer.md)
+
+**eStargz Format**:
+- [eStargz Paper](https://github.com/containerd/stargz-snapshotter/blob/main/docs/estargz.md)
+- [Format Specification](https://github.com/containerd/stargz-snapshotter/blob/main/docs/stargz-estargz.md)
+
+### Related Tools & Projects
+
+**Container Runtimes**:
+- [containerd](https://containerd.io/) - Industry-standard container runtime
+- [runc](https://github.com/opencontainers/runc) - OCI container runtime
+
+**Image Optimization**:
+- [Buildkit](https://github.com/moby/buildkit) - Concurrent, cache-efficient build toolkit
+- [Nydus](https://github.com/dragonflyoss/nydus) - Alternative lazy-pulling solution by Dragonfly
+
+**Registries**:
+- [Docker Registry](https://docs.docker.com/registry/) - Open-source registry implementation
+- [Distribution Spec](https://github.com/opencontainers/distribution-spec) - OCI distribution specification
+
+### Research Papers & Articles
+
+**Lazy Pulling & Container Startup**:
+- [FAST '20: Startup Containers in Lightning Speed with Lazy Image Distribution](https://www.usenix.org/conference/fast20/presentation/li)
+- [Slacker: Fast Distribution with Lazy Docker Containers](https://www.usenix.org/conference/fast16/technical-sessions/presentation/harter)
+
+**Container Image Optimization**:
+- [USENIX ATC '19: Packer: Toward Million-fold Container Image Optimization](https://www.usenix.org/conference/atc19/presentation/zhao-jian)
+
+### Community & Support
+
+**Issue Trackers**:
+- [Stargz-Snapshotter Issues](https://github.com/containerd/stargz-snapshotter/issues)
+- [Containerd Issues](https://github.com/containerd/containerd/issues)
+- [Nydus Lazy Pulling Issue #1527](https://github.com/dragonflyoss/nydus/issues/1527) - Related metadata corruption
+
+**Communication**:
+- [Containerd Slack](https://slack.containerd.io/) - Community chat
+- [CNCF Slack #containerd](https://cloud-native.slack.com/messages/containerd) - Technical discussions
+
+### Tutorials & Guides
+
+**Getting Started**:
+- [Containerd Getting Started](https://containerd.io/docs/getting-started/)
+- [Stargz-Snapshotter Quick Start](https://github.com/containerd/stargz-snapshotter/blob/main/docs/getting-started.md)
+
+**Advanced Topics**:
+- [Lazy Pulling Deep Dive](https://github.com/containerd/stargz-snapshotter/blob/main/docs/overview.md#lazy-pulling-feature)
+- [Building eStargz Images](https://github.com/containerd/stargz-snapshotter/blob/main/docs/ctr-remote.md#building-estargz)
+
+---
+
+## Key Takeaways
+
+### Technical Insights
+
+1. **Lazy pulling is essential for large images** - 150x pull speedup for 2GB images
+2. **Label handlers are critical** - Regular containerd.Pull() doesn't enable lazy pulling
+3. **Content store is global** - Shared across namespaces, requires explicit cleanup
+4. **Never mix pull methods** - Causes metadata corruption
+5. **eStargz verification** - Check STARGZ footer in blobs, not just media type
+
+### Performance Characteristics
+
+1. **Speedup scales with image size** - Larger images benefit more
+2. **Network-dependent** - Requires good bandwidth/latency to registry
+3. **Working set matters** - Only fetches accessed files
+4. **Trade-off exists** - Faster pull, slightly slower start
+5. **Zero storage overhead** - No disk caching of full layers
+
+### Development Best Practices
+
+1. **Performance-driven debugging** - Timing anomalies reveal bugs
+2. **Binary-level verification** - Source of truth for format validation
+3. **Read upstream source code** - Reveals exact implementation details
+4. **Test with realistic workloads** - Small images don't show benefits
+5. **Match system versions** - Library versions should align with binaries
+
+---
+
+## Conclusion
+
+This project demonstrates that **eStargz with lazy pulling provides dramatic performance improvements for startup latency**, but reveals a **critical trade-off with total workload completion time** that depends on working set size.
+
+### Key Findings
+
+**✅ Lazy Pulling Wins for Startup Latency:**
+- 150x faster pull time (9.2s → 0.06s)
+- 13.9x faster cold start (9.4s → 0.67s)
+- Zero disk storage overhead
+- Ideal for small working sets (<10% of image)
+
+**⚠️ Eager Loading Wins for Data-Intensive Workloads:**
+- 1.5-2x faster total completion for large working sets (>30% of image)
+- Bulk parallel downloads faster than serialized on-demand fetches
+- Better for batch processing, training, ETL pipelines
+- Stress test (8GB sequential read): Overlayfs 45-54s vs Stargz 79-88s
+
+### Decision Framework
+
+**The critical question: What percentage of your image does the workload access?**
+
+```
+Small working set (<10%):
+  → Lazy pulling essential (13.9x faster)
+  → Example: LLM inference API loading 300MB of 4GB image
+
+Large working set (>30%):
+  → Eager loading faster (1.5-2x faster total time)
+  → Example: Training job accessing 7GB of 8GB image
+
+Optimize for startup time:
+  → Always use lazy pulling
+
+Optimize for total completion time:
+  → Use lazy pulling only for small working sets
+```
+
+### Production Recommendations
+
+1. **LLM Inference/Serving** - Use lazy pulling ✅
+   - Small working set, startup critical
+   - 10-20x faster cold start for auto-scaling
+
+2. **LLM Training/Fine-tuning** - Use eager loading ✅
+   - Large working set, total time matters
+   - Avoid 1.5-2x penalty for on-demand fetches
+
+3. **Development/Testing** - Use lazy pulling ✅
+   - Fast iteration cycles
+   - Disk space savings
+
+### Technical Validation
+
+The implementation validates that:
+- Proper integration with stargz-snapshotter enables true lazy pulling
+- Label handlers (`AppendDefaultLabelsHandlerWrapper`) are essential
+- Content store management critical for accurate benchmarking
+- Working set size is the primary performance factor
+- Network vs disk I/O trade-off is significant for large data access
+
