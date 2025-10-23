@@ -6,7 +6,7 @@ date: 2025-10-22T00:00:00+00:00
 draft: true
 ---
 
-For those of the initiated, who are aware of how docker system works and just wish for a no nonsence, TLDR
+For those of the initiated, who are aware of how docker system works and just wish for a no nonsense, TLDR
 benchmark results, here they are,
 
 1) TCP Network bandwidth between a container and host system
@@ -58,9 +58,9 @@ that start with `veth` prefix,
 A point to note is on this particular `veth` interface you can see `master docker0`. What does this signify ?
 
 To give further information, the `docker0` network interface highlighted above is what is known as a docker bridge network. To be more
-specific it is a specific kind of virtual network interface, one of many infact, that you can create in a linux system. This 
+specific it is a specific kind of virtual network interface, one of many in fact, that you can create in a linux system. This 
 bridge network interface, allows other network interface to be "connected" virtually. This is analogous to a physical network switch.
-A network switch only connects devices to the same LAN. It has no routing capability, and infact it is required that all the devices
+A network switch only connects devices to the same LAN. It has no routing capability, and in fact it is required that all the devices
 that are connected on the network be on the same CIDR network range. Any new docker network you create will always result in creation
 of a new bridge network interface, and every container that is on the same docker network will have a connection to that specific
 network bridge.
@@ -127,9 +127,9 @@ socat TCP4-LISTEN:5201,fork TCP4:172.17.0.3:5201
 What this is essentially doing is creating a TCP stream on port 5201, on the host system, which is connected to TCP on endpoint,
 `172.17.0.3:5201`. With this container A, can reach a server at container B, by just sending the request to host instead.
 
-- The second way to achieve this is by performing routing on the kernelspace itself. This is infact the same way any network router, 
-that runs linux would work. For this feature to work, you first have to enable IP packtes forwarding on your kernel. Without this 
-feature enabled, any packet that reaches your linux machine will be droppped. With the feature enabled, the linux machine will
+- The second way to achieve this is by performing routing on the kernel space itself. This is in fact the same way any network router, 
+that runs linux would work. For this feature to work, you first have to enable IP packets forwarding on your kernel. Without this 
+feature enabled, any packet that reaches your linux machine will be dropped. With the feature enabled, the linux machine will
 first evaluate it's internal routing table, and any routes matched will be forwarded appropriately else, discarded. A thing to note is
 that this entire thing happens inside the kernel space, without the network reaching userspace at all. To check if the feature is
 enabled, run `cat /proc/sys/net/ipv4/ip_forward`. If the output is 1, then it is enabled, if not then this feature is currently disabled.
@@ -139,7 +139,7 @@ this feature also enabled, as docker makes use of IP-forwarding quite extensivel
 >Note: This only enabled ip forwarding for IPv4 network, for IPv6 network you will have to use, `net.ipv6.conf.all.forwarding` key instead.
 
 Once, forwarding has been enabled, you will also have to add the routes to the routes table for kernel to forward the routes. 
-Let's assume that Contaienr B will have the server and Container A is to proxy it's request through host, then use the following 
+Let's assume that Container B will have the server and Container A is to proxy it's request through host, then use the following 
 2 commands to setup the routing route.
 ```
 sudo iptables -t nat -A PREROUTING -d 172.17.0.1 -p tcp --dport 5201 -j DNAT --to-destination 172.17.0.3:5201
@@ -149,8 +149,8 @@ sudo iptables -t nat -A POSTROUTING -s 172.17.0.0/16 -d 172.17.0.3 -j MASQUERADE
 Let's understand what these 2 commands are doing, the first, command essentially means, that any tcp request that comes for 
 ip `172.17.0.1` with destination port set to `5201` should be instead be forwarded to destination `172.17.0.3:5201`. 
 Similarly, the second command, tells any request that will leave the system, with that fall into source IP of `172.17.0.0/16`, 
-heading into `172.17.0.3` should have their network address masqueraded. Masqueration basically changes the source IP of the packet,
-to the packet of the linux machine. This is a crucial step, as without masqueration, the response sent by server will not come 
+heading into `172.17.0.3` should have their network address masqueraded. Masquerading basically changes the source IP of the packet,
+to the packet of the linux machine. This is a crucial step, as without masquerading, the response sent by server will not come 
 back to the same host system. In our case, this doesn't really break network connection as our Container B can still reach, Container A 
 however, in majority of cases, the secondary machine will not have the knowledge on how to route back the message, and thus the
 network connection will be broken. Even so, failing to set this rule, will mean we have an incomplete experiment as the trip back,
