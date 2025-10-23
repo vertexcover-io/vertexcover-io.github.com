@@ -10,16 +10,27 @@ For those of the initiated, who are aware of how docker system works and just wi
 benchmark results, here they are,
 
 1) TCP Network bandwidth between a container and host system
+
     - When Container acts as server, and Host as client
+
         => 3.5-4 GBytes/sec
+
     - When Host acts as server, and Container as client
+
         => 3-3.5 GBytes/sec
+
 2) TCP Network bandwidth between 2 containers running on same docker network
+
     => 3.7 GBytes/sec
+
 3) Connection between 2 containers running on same networking, but with host acting as a proxy.
+
     - Userspace proxy, (`socat` utilized)
+
         => 0.6 GBytes/sec
+
     - Kernel space proxy (`iptables` routing set)
+
         => 2.8 GBytes/sec
         
 For people that wish to know more about docker networking, or perhaps how the above experiment was conducted,
