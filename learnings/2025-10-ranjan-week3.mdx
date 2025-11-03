@@ -1,0 +1,238 @@
+---
+title: "Weekly learnings: Week3"
+date: 2025-10-31
+type: weekly
+authors: [ranjan]
+tags: []
+---
+
+Benchmarking and understanding estargz format.
+
+{/* truncate */}
+
+## Autoscaling for wordpress.
+
+Given that wordpress is just a bunch of php files that is served using any webserver, 
+along with connection to the same mysql database. The best way to autoscale any wordpress
+workload is by having the same mysql instance serving various webservers. Each web servers, 
+are basically any machine with apache, or nginx looking into `/var/www/html` or an 
+equivalent folder and serving the files found on the location. The files being served, 
+can be a read only mount. The only time a write modification needs to be made is when, 
+the website is modified to add themes, or anything similar. The files are then mounted 
+on a shared network file system or something similar. This allows the website to be easily 
+replicated.
+
+However, this does break automatic updates. Although, when dealing with multiple wordpress
+servers like this, it's better an update is handled separately indeed. You can have a
+separate dev, instance, that can even be a single server. This server thus has write enabled,
+the developers will update the wordpress every week, and if any automatic updates is enabled
+it will update accordingly. In a release cycle then the read only production nfs can
+be substituted in.
+
+## Optimized image done by estargz
+
+When creating a new container image with estargz, we can employ `ctr-remote` utility, 
+provided by the `stargz-snapshotter` github. This actually has an additional functionality
+that allows us to optimize image for run. This is done by generating a `record-out` file for 
+each of the files accessed. The default timeout is of 10 seconds during which any files
+that are accessed are writtent to the above mentioned `record-out` file. 
+```jsonl
+{"path":"usr/bin/bash","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":0}
+{"path":"usr/bin/bash","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":0}
+{"path":"usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":5}
+{"path":"etc/ld.so.cache","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":6}
+{"path":"usr/lib/x86_64-linux-gnu/libtinfo.so.6.3","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":0}
+{"path":"usr/lib/x86_64-linux-gnu/libc.so.6","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":5}
+{"path":"etc/nsswitch.conf","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":0}
+{"path":"etc/nsswitch.conf","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":0}
+{"path":"etc/passwd","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":0}
+{"path":"app/init.sh","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":13}
+{"path":"usr/local/bin/wasmedge","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":6}
+{"path":"usr/local/bin/wasmedge","manifestDigest":"sha256:6eef62000ff8401c8c6bcc4dbf07772ba63baed001bf955277b76a9af623cb40","layerIndex":6}
+```
+Example, `record-out` file. 
+
+`nerdctl` a containerd CLI utility that uses API similar to docker also has an additional
+option to optimize the image during image conversion, however, it requires this `record-out`
+file to be supplied and doesn't generate the `record-out` by itself. 
+Looking at options, its also visible that `nydus` another project that does lazy loading, 
+also allows similar optimizations.
+
+> Note: Exporting any estargz image will convert it back into OCI/Docker image so it's not 
+> possible to transfer images using regular `export` and `import`. It is required that users
+> perform an actual transfer, with pull, tag and push.
+
+## GPU support when utilizing `ctr` utility.
+
+Given that you have setup all the GPU based utility, you can enable `gpu` support for your
+container by using the `--gpus` flag. However, a point to note. While higher level API's 
+exposed by `nerdctl` and `docker` assume that the number you are passing in for `--gpus`
+is the number of gpu you want to expose to the container. for `ctr` it's the device number.
+So if you for instance only have a single gpu, then in `ctr` you will have to enter command 
+like, `ctr run --gpus 0 <img name>`.
+Whereas, for `nerdctl` it looks like, `nerdctl run --gpus 1 <img_name>`.
+
+## Insights into estargz 
+
+estargz, is a technology inspired from stargz. However, unlike stargz, that introduces it's 
+own format, estargz aims to remain backward compatible. That means, any estargz images can 
+be used in every existing infrastructure for container system at present. To enable the
+specific optimizations however, it is needed for us to utilize the estargz specific utilities.
+
+### Verification
+
+Each `tar.gz` layer in `estargz` image, has a footer of fixed length (51 bytes). The 
+footer has offset index about a file called `TOC`. This `TOC` file is infact, a 
+`.stargz.index.json` file that contains details like, the `sha:hash` of the file, as well,
+as the file and directory entries contained in the layer.
+
+### Prefetch
+
+Prefetch is made using the optimized image conversion. Every estargz image should have 
+information about prefetch included in it's `.stargz.index.json` file. If no prefetch is 
+enabled then there should be a `.noprefetch.landmark` file inside the tar as well as said
+file should be listed in the image `.stargz.index.json` as the first file entry. This
+tells the runtime that every other file must be fetched using HTTP range access during 
+runtime.
+For files, that are to be prefetched, a special `.prefetch.landmark` file should be included
+in the tar file. Similarly, the file should also be mentioned in the `.stargz.index.json` 
+file. Each file, that is mentioned before `.stargz.index.json` is a candidate for prefetching
+and any file mentioned after are not prefetched.
+
+There are further additional config values that determine the prefetch. Inside config file,
+the default location which is `/etc/containerd-stargz-grpc/config.toml`, we can find 
+following config values,
+```toml
+prefetch_timeout_sec = 10
+prefetch_size = <size value in bytes>
+```
+These values dictate the number of bytes to prefetch and the time prefetch is allowed. 
+However, in practice even when setting these to a high value to allow for prefetching of 
+large file didn't really benefit much from this value.
+
+```json
+{
+	"version": 1,
+	"entries": [
+		{
+			"name": ".no.prefetch.landmark",
+			"type": "reg",
+			"size": 1,
+			"offset": 90,
+			"digest": "sha256:dc0e9c3658a1a3ed1ec94274d8b19925c93e1abb7ddba294923ad9bde30f8cb8",
+			"chunkDigest": "sha256:dc0e9c3658a1a3ed1ec94274d8b19925c93e1abb7ddba294923ad9bde30f8cb8"
+		},
+		{
+			"name": "app/",
+			"type": "dir",
+			"modtime": "2024-04-25T11:57:31Z",
+			"mode": 493
+		},
+		{
+			"name": "app/init.sh",
+			"type": "reg",
+			"size": 278,
+			"modtime": "2024-04-25T11:57:31Z",
+			"mode": 493,
+			"offset": 214,
+			"digest": "sha256:46ea830e1ec2bcfb0d965468862c151d0bd552b32ca02dc9620b65ea8472212e",
+			"chunkDigest": "sha256:46ea830e1ec2bcfb0d965468862c151d0bd552b32ca02dc9620b65ea8472212e"
+		}
+	]
+}
+```
+example `.stargz.index.json` file without optimization
+
+```json
+{
+	"version": 1,
+	"entries": [
+		{
+			"name": "app/",
+			"type": "dir",
+			"modtime": "2024-04-25T11:57:31Z",
+			"mode": 493
+		},
+		{
+			"name": "app/init.sh",
+			"type": "reg",
+			"size": 278,
+			"modtime": "2024-04-25T11:57:31Z",
+			"mode": 493,
+			"offset": 118,
+			"digest": "sha256:46ea830e1ec2bcfb0d965468862c151d0bd552b32ca02dc9620b65ea8472212e",
+			"chunkDigest": "sha256:46ea830e1ec2bcfb0d965468862c151d0bd552b32ca02dc9620b65ea8472212e"
+		},
+		{
+			"name": ".prefetch.landmark",
+			"type": "reg",
+			"size": 1,
+			"offset": 435,
+			"digest": "sha256:dc0e9c3658a1a3ed1ec94274d8b19925c93e1abb7ddba294923ad9bde30f8cb8",
+			"chunkDigest": "sha256:dc0e9c3658a1a3ed1ec94274d8b19925c93e1abb7ddba294923ad9bde30f8cb8"
+		}
+	]
+}
+```
+example `.stargz.index.json` file with optimizations enabled.
+
+### background fetch
+
+With estargz, they have a background fetch capability, by which, when no priority work
+is going on by default in `containerd-stargz-grpc`, then the entire image layers are 
+pulled in background. Once all the layers have been fetched, it works similar to the 
+regular image as all the files have already been fetched. This feature can be disabled
+by setting the
+```toml
+no_background_fetch = true
+max_concurrency = 2
+```
+config value in `/etc/containerd-stargz-grpc`. 
+`max_concurrency` determines the maximum number of background threads that are spawned for
+pulling image layers. The default value is 2.
+
+
+### Fetched files
+
+We can access the files that were downloaded during runtime for any estargz image, ran with
+`containerd-stargz-grpc` by, reading json files, inside, `/.stargz-snapshotter` directory 
+of the running container. The json files correspond to each layer available in final image.
+This directory is hidden from `getdents(2)` so it can't be seen using `ls -a /` but, can be
+directly accessed by specifying the path `/.stargz-snapshotter`.
+```jsonl
+{"digest":"sha256:2b1fc65cafe05b65acc9e9f186df4dd81ae74c58ef73d89ecfc15e7286b3e960","size":131339690,"fetchedSize":7939690,"fetchedPercent":6.045156646859757}
+{"digest":"sha256:42d56485c1f672e394a02855048774621731c8fd44a54dc816a421a3a52b8482","size":10047608,"fetchedSize":2047608,"fetchedPercent":20.379059374131632}
+{"digest":"sha256:6a5826d877de5c93fb4a9e1d0369cfdef6d43df2610562501ebf42e4bcb2ef73","size":54352828,"fetchedSize":2302828,"fetchedPercent":4.236813584014432}
+{"digest":"sha256:a4d35801573274df19d9c2ae2aed80eba96d5aa69a38c464e1f01f9abf81e34e","size":70359295,"fetchedSize":2259295,"fetchedPercent":3.211082487395588}
+{"digest":"sha256:ab13100112faac6e04d2da2281db3df942efc8cef2532ab2cac688c6232944d8","size":7890588,"fetchedSize":2140588,"fetchedPercent":27.12837116828302}
+{"digest":"sha256:e8cc31024eb09fe216ad906392aec139038330c6d29dfd3fe5c81c4b2dd21430","size":52934435,"fetchedSize":2634435,"fetchedPercent":4.976788738748227}
+{"digest":"sha256:f077511be7d385c17ba88980379c5cd0aab7068844dffa7a1cefbf68cc3daea3","size":580,"fetchedSize":580,"fetchedPercent":100}
+```
+> Note: above result is obtained by `cat /.stargz-snapshotter/*` command, each json file, 
+> inside `/.stargz-snapshotter` will hold information only about that layer.
+
+
+### Bandwidth
+
+An interesting observation is that the network utilization is not the same depending on when
+the fetch happens. For instance, based on empirical measurements,
+- During regular image pull from ecr I was getting about 24 MiB/s of network traffic
+- The same image if pulled by `containerd-stargz-grpc` in it's background image fetch stage
+    is fetching the image  at about `8 MiB/s`. This value was improved after increasing the
+    number of background threads allowed to pull the image, to about `20-21 MiB/s`.
+- The image during prefetch stage does show significant network traffic in the initial
+    phase, but it quickly drops off and doesn't resume again.
+- The slowest network traffic was observed during runtime pull at, `5-6 MiB/s`. Further 
+    research into the system didn't prove as fruitful either. The issue is probably
+    a combination of network latency, added with latency from fuse server communication.
+    Based on modal blogs there were a few fuse settings that I attempted to modify,
+    using the custom build of `containerd-stargz-grpc` however, they didn't improve the 
+    network traffic situation at all, and infact based on measurements may have even 
+    worsened it.
+    
+
+
+
+
+
+
