@@ -68,7 +68,7 @@ Overlayfs (eager loading):
   Total: 45-54s
 
 Stargz (lazy loading):
-  Metadata pull: <1s
+  Metadata pull: &lt;1s
   Workload execution: 78-87s (many serialized HTTP range requests)
   ────────────────────────────────────
   Total: 79-88s (1.5-2x SLOWER!)
@@ -86,7 +86,7 @@ Stargz (lazy loading):
    - BUT penalizes total workload completion when data access is substantial
 
 2. **Working set size is critical**
-   - Small working set (<10%): Lazy pulling wins dramatically (13.9x faster)
+   - Small working set (&lt;10%): Lazy pulling wins dramatically (13.9x faster)
    - Large working set (>30%): Eager loading wins (1.5-2x faster)
 
 3. **File pattern sensitivity**
@@ -154,16 +154,16 @@ Data returned (cached in memory, NOT disk)
 
 ### Performance Implications
 
-**Small Working Set (<10% of image):**
+**Small Working Set (&lt;10% of image):**
 ```
-Pull: <1s (metadata only)
+Pull: &lt;1s (metadata only)
 Runtime: Fast (few on-demand fetches)
 Total: 13.9x faster than eager loading ✅
 ```
 
 **Large Working Set (>30% of image):**
 ```
-Pull: <1s (metadata only)
+Pull: &lt;1s (metadata only)
 Runtime: 78-87s (many serialized HTTP requests)
 Total: 1.5-2x SLOWER than eager loading ❌
 
@@ -316,7 +316,7 @@ Working Set 10-30% of image:
 
 **Best for startup latency optimization:**
 
-1. **Small working set** (<10% of image accessed)
+1. **Small working set** (&lt;10% of image accessed)
    - Example: Web API loading libraries (100MB of 2GB image)
    - Result: 13.9x faster cold start
 
@@ -365,7 +365,7 @@ Result: 9-18x faster! ✅
    - Each file = separate HTTP request with lazy pulling
    - Bulk download is much faster (parallel, large chunks)
 
-4. **Small images** (<100MB) - overhead not worth it
+4. **Small images** (&lt;100MB) - overhead not worth it
    - Metadata overhead dominates
 
 5. **Slow/high-latency network** - on-demand fetches will be slow
@@ -389,12 +389,12 @@ Result: Eager 1.5-2x faster! ✅
 
 | Metric to Optimize | Image Size | Working Set | Recommendation |
 |-------------------|------------|-------------|----------------|
-| **Cold start time** | Large (>1GB) | Small (<10%) | Lazy pulling ✅ |
+| **Cold start time** | Large (>1GB) | Small (&lt;10%) | Lazy pulling ✅ |
 | **Cold start time** | Large (>1GB) | Large (>30%) | Lazy pulling ✅ (startup only) |
-| **Total completion time** | Large (>1GB) | Small (<10%) | Lazy pulling ✅ |
+| **Total completion time** | Large (>1GB) | Small (&lt;10%) | Lazy pulling ✅ |
 | **Total completion time** | Large (>1GB) | Large (>30%) | Eager loading ✅ |
 | **Disk usage** | Any | Any | Lazy pulling ✅ |
-| **Network bandwidth** | Large (>1GB) | Small (<10%) | Lazy pulling ✅ |
+| **Network bandwidth** | Large (>1GB) | Small (&lt;10%) | Lazy pulling ✅ |
 | **Network bandwidth** | Large (>1GB) | Large (>30%) | Eager loading ✅ |
 
 ---
@@ -416,7 +416,7 @@ Result: Eager 1.5-2x faster! ✅
 3. **Trade-offs**
    - **Startup latency**: Lazy pulling dramatically faster (13.9x)
    - **Total completion**: Depends on working set size
-     - Small working set (<10%): Lazy pulling wins (13.9x faster)
+     - Small working set (&lt;10%): Lazy pulling wins (13.9x faster)
      - Large working set (>30%): Eager loading wins (1.5-2x faster)
    - **Network vs Disk I/O**:
      - Bulk parallel download: ~45-53s for 8GB
@@ -624,7 +624,7 @@ This project demonstrates that **eStargz with lazy pulling provides dramatic per
 - 150x faster pull time (9.2s → 0.06s)
 - 13.9x faster cold start (9.4s → 0.67s)
 - Zero disk storage overhead
-- Ideal for small working sets (<10% of image)
+- Ideal for small working sets (&lt;10% of image)
 
 **⚠️ Eager Loading Wins for Data-Intensive Workloads:**
 - 1.5-2x faster total completion for large working sets (>30% of image)
@@ -637,7 +637,7 @@ This project demonstrates that **eStargz with lazy pulling provides dramatic per
 **The critical question: What percentage of your image does the workload access?**
 
 ```
-Small working set (<10%):
+Small working set (&lt;10%):
   → Lazy pulling essential (13.9x faster)
   → Example: LLM inference API loading 300MB of 4GB image
 
