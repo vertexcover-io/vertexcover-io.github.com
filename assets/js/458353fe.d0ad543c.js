@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[6254],{6593:e=>{e.exports=JSON.parse('{"tag":{"label":"mcp","permalink":"/tags/mcp","allTagsPath":"/tags","count":2,"unlisted":false},"listMetadata":{"permalink":"/tags/mcp","page":1,"postsPerPage":10,"totalPages":1,"totalCount":2,"blogDescription":"Blog","blogTitle":"Blog"}}')}}]);
