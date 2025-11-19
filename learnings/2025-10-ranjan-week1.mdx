@@ -9,7 +9,7 @@ draft: false
 
 {/* truncate */}
 
-# Container Checkpoint and Restore
+## Container Checkpoint and Restore
 
 Container checkpoint and restore is a facility by which any running Linux container is saved to memory 
 and later restored at a later time from the same point at which the checkpoint was created. This restore
@@ -35,7 +35,7 @@ container runtime utility, `runsc` which stands for `run sandboxed container`, t
 added functionality for checkpoint and restore. Given that `gVisor` has a usermode kernel functionality, it can 
 infact, offer more granularity and features for checkpoint and restore.
 
-## Limitations
+### Limitations
 
 - While the restore can be made in different computer, it has to mimic the original system as much as possible. Otherwise the invariants that program expect to be maintained will be broken, and can lead to some nasty surprises down the line. 
 - The CPU that the restore is made on has to match the instruction set, where the snapshot was taken, otherwise there can be runtime issues with invalid opcode.
@@ -44,7 +44,7 @@ infact, offer more granularity and features for checkpoint and restore.
 - A Problem documented in Modal documentation is that, there are some functions in `torch.cuda` that after restoring from snapshot will initialize CUDA as having zero GPU devices. The only fix is to reinitialize `torch.cuda` again.
 - In particular, when loading a huge snapshot, there is a significant CPU pressure as hundreds of 4KiB pages are getting loaded into memory. Such a particular workload is particularly affected by [CPU Stalls](#cpu-stalls).
   
-# CPU Stalls
+## CPU Stalls
 
 To explain a CPU stall, we first need to understand that any given process is either running on the CPU or it's not. 
 There can never be in between. So what happens when we have 3 processes each granted 0.3 of CPU running on the system.
@@ -75,7 +75,7 @@ allow it to gain more CPU time. And in the case of multi threaded situation, inf
 beneficial to pin the process to a certain CPU core. Infact, many games actually see quite a significant performance
 boost when their processes are pinned to a few cores rather than allowing them access to all the cores.
 
-# Making `syscalls` in Linux
+## Making `syscalls` in Linux
 
 Most of the program we write, ultimately have to make a `syscall` to do any operation on a system. Understandably, I
 had a misconception that the `syscalls` are themselves exposed over `C-API` and that any language that wishes to make
@@ -106,7 +106,7 @@ in x86_64 system.
 
 - The return value is placed inside `rax`.
 
-# Some tools used to deploy model
+## Some tools used to deploy model
 
 - [ray](https://www.ray.io/) Allows for distributed GPU computation
   - [kuberay](https://docs.ray.io/en/latest/cluster/kubernetes/index.html) to deploy ray in kubernetes
