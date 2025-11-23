@@ -17,3 +17,23 @@ infra:
   label: Infrastructure
   permalink: /infra
   description: Infrastructure
+
+video-processing:
+  label: Video Processing
+  permalink: /video-processing
+  description: Video Processing
+
+ai:
+  label: AI
+  permalink: /ai
+  description: Artificial Intelligence
+
+python:
+  label: Python
+  permalink: /python
+  description: Python Programming
+
+automation:
+  label: Automation
+  permalink: /automation
+  description: Automation

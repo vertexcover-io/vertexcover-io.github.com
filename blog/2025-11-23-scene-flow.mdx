@@ -1,0 +1,146 @@
+---
+slug: "ai-video-cutter-technical-deep-dive"
+title: "Building SceneFlow: The Intelligent Video Cutter"
+date: 2025-11-23T00:00:00+00:00
+authors: [aksdev]
+tags: [video-processing, ai, python, automation]
+draft: false
+---
+
+import TLDR from '@site/src/components/TLDR';
+import MinimalDetails from '@site/src/components/MinimalDetails';
+
+<TLDR>
+
+**SceneFlow** isn't just a video cutter, it's an intelligent editor. By combining signal processing with **Multimodal AI**, it finds the *perfect* cut points, ensuring your videos never end with awkward freezes, mid-sentence chops, or blinking eyes.
+
+</TLDR>
+
+If you've ever worked with AI-generated videos (like those from HeyGen or Synthesia), you know the problem. The content is great, but the endings are... weird. The avatar freezes, stares blankly into the soul of the viewer, or cuts off mid-breath.
+
+To make these videos production-ready, you have to manually trim that awkward tail. For one video, it's fine. For 1,000 personalized outreach videos? It's a nightmare.
+
+We wanted to automate this. But simple tools like `ffmpeg` or basic silence detectors aren't enough. They don't "see" the video. They don't know if an avatar's face looks unnatural.
+
+So we built **SceneFlow**.
+
+{/* truncate */}
+
+## Why SceneFlow Works Better
+
+Traditional video cutters rely on simple metrics: "Is there silence?" or "Is there a black frame?". SceneFlow goes deeper. It treats video editing like a human editor would, looking for context, visual stability, and natural flow.
+
+### 1. Smart Window Search
+
+Instead of blindly cutting at a timestamp, SceneFlow treats your request as a "suggestion." We know the best cut point is often *before* the awkward freeze at the end.
+
+**We first check the video from the end** with a defined window size. We scan backwards, looking for potential "good points" to cut—moments of silence, stillness, and composure.
+
+If we don't find any good candidates in the initial window, we **expand the window** and search again. This ensures we don't force a cut in a bad spot just to satisfy a tight timing constraint.
+
+### 2. Candidate Ranking & AI Selection
+
+Once we have a list of potential candidates, the system **ranks them accordingly** based on signal processing metrics (silence duration, motion stability, facial landmarks).
+
+But we don't just pick the top mathematical score. We bring in the heavy lifters.
+
+We make use of models like **GPT-4o**, providing:
+1.  **Metadata**: Timestamps, confidence scores, and heuristic data.
+2.  **Potential Candidates**: The specific frames and their context.
+3.  **System Prompt**: A carefully crafted instruction that helps the model understand the context to select the *best* frame to cut the video at.
+
+This allows the AI to make a subjective, "human-like" decision: *"Cut here because the speaker finished their sentence and smiled,"* rather than just *"Cut here because silence > 0.5s."*
+
+<img src="/img/sceneflow.png" alt="SceneFlow Architecture" style={{ width: '30%', display: 'block', margin: '0 auto' }} />
+
+### 3. The 3-Layer Safety System
+
+Before any candidate even reaches the ranking stage, it must pass three strict filters.
+
+1.  **Speech Safety**: Uses OpenAI's Whisper to ensure we never cut inside a word. We look for gaps > 200ms.
+2.  **Motion Safety**: Analyzes optical flow to avoid cutting during fast movements or gestures.
+3.  **Face Safety**: The "Vibe Check." We use facial landmarks and **Eye Aspect Ratio (EAR)** to ensure the speaker isn't blinking or mid-speech.
+
+## Real-World Challenges We Faced
+
+Building SceneFlow wasn't just about wiring up APIs. We hit some genuinely hard problems.
+
+### The "Avatar Freeze" Problem
+
+AI-generated avatars often have a bizarre quirk: they freeze for 0.5-1.5 seconds at the end of a video. Not a clean freeze, their eyes stay open, lips slightly parted, in an uncanny valley stare. Basic silence detection would cut during this freeze, which *technically* works but looks awful.
+
+We solved this by adding a **post-speech analysis phase**. After Whisper identifies the last spoken word, SceneFlow keeps analyzing for another 2 seconds. It looks for the first frame where:
+
+1. The mouth fully closes
+2. The face settles into a neutral expression
+3. Motion drops to near-zero
+
+This tiny adjustment made generated videos look 10x more professional.
+
+### The "Mid-Gesture" Problem
+
+Optical flow is great at detecting *large* motion, but bad at detecting *subtle* gestures. A speaker might be perfectly still from the waist up, but their hand is moving off-screen. Early versions of SceneFlow would happily cut during these moments, making the final frame look awkward.
+
+We fixed this by implementing **region-of-interest (ROI) weighting**. The algorithm gives more weight to motion near the speaker's face and less weight to the edges of the frame. Now it can distinguish between "speaker is gesturing" and "a car drove by in the background."
+
+### The Token Cost Problem
+
+Sending full video frames to GPT-4o or Claude is *expensive*. A single 1080p frame can be several hundred kilobytes. If you're analyzing 10-20 candidate frames, you're looking at $0.50-$1.00 per cut.
+
+We optimized this by:
+
+*   **Downscaling frames** to 512px width before sending to the AI (still enough detail to judge facial expressions).
+*   **Using context frames** instead of sending every frame (the AI doesn't need to see *every* second of the video to understand the flow).
+*   **Implementing early rejection** (if Whisper or optical flow already rules out a timestamp, we don't bother sending it to the AI).
+
+
+## When to Use SceneFlow
+
+SceneFlow is designed for high-quality, automated video workflows. It excels in situations where precision and polish matter.
+
+*   **AI Avatar Videos**: Perfect for cleaning up the awkward starts and stops of generated content from platforms like HeyGen or Synthesia.
+*   **Webinar & Podcast Clips**: Extracting short, punchy clips from long-form content without cutting off speakers mid-sentence.
+
+## How to Use It
+
+SceneFlow is built as a powerful CLI tool that fits right into your existing pipelines.
+
+### Basic Cut
+Cut a video at a specific timestamp, but let SceneFlow find the optimal spot nearby:
+
+```bash
+sceneflow cut single input.mp4 630.0 output.mp4 --mode balanced
+```
+
+## See it in Action
+
+Here's a comparison of a raw AI-generated video versus one processed by SceneFlow. Notice how the "After" clip ends naturally without the awkward freeze.
+
+<div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap' }}>
+  <div style={{ textAlign: 'center' }}>
+    <p><strong>Before (Raw)</strong></p>
+    <video width="100%" style={{ maxWidth: '300px', borderRadius: '8px' }} controls>
+      <source src="/video/before.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <div style={{ textAlign: 'center' }}>
+    <p><strong>After (SceneFlow)</strong></p>
+    <video width="100%" style={{ maxWidth: '300px', borderRadius: '8px' }} controls>
+      <source src="/video/after.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+  </div>
+</div>
+
+> **Note:** The video1 is the source video and the video2 is the resultent video after processing by SceneFlow.
+
+## Conclusion
+
+"AI Video Editing" isn't just about throwing a video into an LLM. It's about building a robust pipeline where **Signal Processing** handles the precision (pixels, audio waves, motion vectors) and **Generative AI** handles the understanding (context, semantics, visual composition).
+
+The hardest part wasn't the AI, it was the *integration*. Making Whisper's word-level timestamps align with optical flow data, synchronizing facial landmark detection with frame extraction, and ensuring the multimodal AI receives exactly the right context at the right time.
+
+SceneFlow bridges this gap, giving you the scale of automation with the polish of a human editor. Whether you're processing 1 video or 10,000, every cut looks intentional.
+
+The code is open source. Give it a spin and stop scrubbing through timelines manually.
