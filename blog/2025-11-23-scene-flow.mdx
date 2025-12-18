@@ -16,7 +16,15 @@ import MinimalDetails from '@site/src/components/MinimalDetails';
 
 </TLDR>
 
-If you've ever worked with AI-generated videos (like those from HeyGen or Synthesia), you know the problem. The content is great, but the endings are... weird. The avatar freezes, stares blankly into the soul of the viewer, or cuts off mid-breath.
+If you've ever worked with AI-generated videos, you know the problem. The content is great, but the endings are... weird. The avatar freezes, stares blankly into the soul of the viewer, or cuts off mid-breath.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0' }}>
+  <video width="100%" style={{ maxWidth: '300px', borderRadius: '8px' }} controls>
+    <source src="/video/before_last3s.mp4" type="video/mp4" />
+    Your browser does not support the video tag.
+  </video>
+  <p style={{ marginTop: '10px', fontStyle: 'italic', color: 'var(--ifm-color-emphasis-600)' }}>Notice the awkward movement of the subject at the end of this AI-generated video</p>
+</div>
 
 To make these videos production-ready, you have to manually trim that awkward tail. For one video, it's fine. For 1,000 personalized outreach videos? It's a nightmare.
 
@@ -26,73 +34,110 @@ So we built **SceneFlow**.
 
 {/* truncate */}
 
-## Why SceneFlow Works Better
+## Why did we build SceneFlow
 
-Traditional video cutters rely on simple metrics: "Is there silence?" or "Is there a black frame?". SceneFlow goes deeper. It treats video editing like a human editor would, looking for context, visual stability, and natural flow.
+It started with a client project. We were working with AI-generated avatar videos, hundreds of them for personalized outreach campaigns. The content itself was impressive. The avatars looked natural, the scripts were on point, and the lip-sync was nearly flawless.
 
-### 1. Smart Window Search
+But there was one consistent problem: **the endings were terrible**.
 
-Instead of blindly cutting at a timestamp, SceneFlow treats your request as a "suggestion." We know the best cut point is often *before* the awkward freeze at the end.
+Every video would finish with the avatar in some awkward state, mid-breath, eyes half-closed, mouth slightly open, or frozen in an unnatural pose. For a single video, you'd just trim it manually and move on. But when you're processing hundreds of videos that need to be stitched together into sequences, those bad endings become a real problem. The transitions between clips looked jarring and unprofessional.
 
-**We first check the video from the end** with a defined window size. We scan backwards, looking for potential "good points" to cut—moments of silence, stillness, and composure.
+<div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', margin: '20px 0' }}>
+  <div style={{ textAlign: 'center' }}>
+    <p><strong>Actual Cut Frame</strong></p>
+    <img src="/img/before_last_frame.jpg" alt="Actual cut frame - awkward ending" style={{ maxWidth: '250px', borderRadius: '8px' }} />
+    <p style={{ marginTop: '8px', fontStyle: 'italic', color: 'var(--ifm-color-emphasis-600)', fontSize: '0.9em' }}>Awkward pose, eyes half-closed</p>
+  </div>
+  <div style={{ textAlign: 'center' }}>
+    <p><strong>Expected Cut Frame</strong></p>
+    <img src="/img/before_last_1.5s.jpg" alt="Expected cut frame - natural ending" style={{ maxWidth: '250px', borderRadius: '8px' }} />
+    <p style={{ marginTop: '8px', fontStyle: 'italic', color: 'var(--ifm-color-emphasis-600)', fontSize: '0.9em' }}>Natural expression, proper ending</p>
+  </div>
+</div>
 
-If we don't find any good candidates in the initial window, we **expand the window** and search again. This ensures we don't force a cut in a bad spot just to satisfy a tight timing constraint.
+We searched for existing tools. Surely someone had solved this, right?
 
-### 2. Candidate Ranking & AI Selection
+We tried silence detectors, they'd cut during pauses, but the avatar might still be moving. We experimented with motion-based cutters, they'd find still moments, but the face might look weird. Nothing understood the full picture: audio *and* video *and* facial expressions all at once.
 
-Once we have a list of potential candidates, the system **ranks them accordingly** based on signal processing metrics (silence duration, motion stability, facial landmarks).
+So we built our own solution.
 
-But we don't just pick the top mathematical score. We bring in the heavy lifters.
+## The Core Intuition: What Makes a "Good" Cut?
 
-We make use of models like **GPT-4o**, providing:
-1.  **Metadata**: Timestamps, confidence scores, and heuristic data.
-2.  **Potential Candidates**: The specific frames and their context.
-3.  **System Prompt**: A carefully crafted instruction that helps the model understand the context to select the *best* frame to cut the video at.
+Before writing any code, we asked ourselves a simple question: *What does a human editor actually look for when trimming a video?*
 
-This allows the AI to make a subjective, "human-like" decision: *"Cut here because the speaker finished their sentence and smiled,"* rather than just *"Cut here because silence > 0.5s."*
+Think about it. When you manually trim a video, you don't just look at the waveform. You *watch* the person. You wait for them to finish their sentence. You check if their eyes are open. You make sure they're not mid-gesture. You look for that brief moment of stillness where everything feels... complete.
 
-<img src="/img/sceneflow.png" alt="SceneFlow Architecture" style={{ width: '30%', display: 'block', margin: '0 auto' }} />
+That's the intuition. **A good cut happens when multiple signals align**: the speaker has stopped talking, their face is composed, their body is still, and visually, the frame looks intentional rather than accidental.
 
-### 3. The 3-Layer Safety System
+The problem is that these signals don't always agree. The audio might be silent, but the speaker is still moving. The face might look great, but they're mid-word. Traditional tools optimize for *one* signal and ignore the rest.
 
-Before any candidate even reaches the ranking stage, it must pass three strict filters.
+SceneFlow's approach is different: **treat each signal as a vote, and find the moment where the most votes align.**
 
-1.  **Speech Safety**: Uses OpenAI's Whisper to ensure we never cut inside a word. We look for gaps > 200ms.
-2.  **Motion Safety**: Analyzes optical flow to avoid cutting during fast movements or gestures.
-3.  **Face Safety**: The "Vibe Check." We use facial landmarks and **Eye Aspect Ratio (EAR)** to ensure the speaker isn't blinking or mid-speech.
+### The Four Pillars of a Clean Cut
+
+We identified four signals that together define a "natural" cut point:
+
+**1. Speech Boundaries**
+
+Are they still talking? We use **Silero VAD** (Voice Activity Detection) to detect exactly when speech ends. It gives us millisecond-accurate timestamps without needing full transcription. However, the VAD timestamps are not always very accurate, which we'll discuss later in this blog.
+
+**2. Motion Stillness**
+
+Are they moving? We use optical flow to track pixel movement between frames. When the motion drops to the lowest 25%, we've found a moment of stillness.
+
+**3. Facial Composure**
+
+Do they look natural? Using **InsightFace**, we detect blinks (EAR), mouth openness (MAR), and head angle. If someone's mid-blink or has their mouth open, it's not a good frame.
+
+**4. Visual Stability**
+
+Is there a scene change? We detect hard cuts, fades, and dissolves. Cutting right before a transition looks accidental; cutting after looks intentional.
+
+### Handling Different Scenarios
+
+SceneFlow is optimized for two primary content types:
+
+**Talking Head / Avatar Videos** — Close-up shots with one speaker, minimal camera movement. Facial analysis dominates here. We're strict about mouth closure, eye state, and subtle expressions. Motion thresholds are tight because any movement is noticeable in a close-up.
+
+**Podcasts & Interviews** — Similar to talking heads, but with wider frames and more natural speech patterns. We weight speech boundaries heavily and allow slightly more tolerance for motion.
+
+## How SceneFlow Implements This
+
+Here's the high-level flow:
+
+**Step 1: Find the speech end** — When you provide a video, we first run Silero VAD to detect the end timestamp of the last speech segment. This gives us a starting point for analysis.
+
+**Step 2: Analyze frames visually** — From that timestamp, we analyze each frame for:
+- **EAR** (Eye Aspect Ratio) — Are they blinking?
+- **MAR** (Mouth Aspect Ratio) — Is their mouth open?
+- **Motion** — Is the subject in motion?
+- **Stability** — Is the frame stable?
+
+**Step 3: Score and rank** — Each frame gets a composite score based on these metrics. We then rank all frames from 1 to n, where rank 1 is the best candidate and rank n is the worst.
+
+**Step 4: Select the best** — The highest-ranked frame becomes the cut point.
+
+The ranking prioritizes frames where the speaker has finished talking, isn't blinking, has their mouth closed, and is relatively still. If no perfect frame exists, we pick the best available.
+
+<img src="/img/sceneflow.png" alt="SceneFlow Architecture" style={{ width: '70%', display: 'block', margin: '0 auto' }} />
 
 ## Real-World Challenges We Faced
 
 Building SceneFlow wasn't just about wiring up APIs. We hit some genuinely hard problems.
 
-### The "Avatar Freeze" Problem
+### The VAD Timestamp Inaccuracy Problem
 
-AI-generated avatars often have a bizarre quirk: they freeze for 0.5-1.5 seconds at the end of a video. Not a clean freeze, their eyes stay open, lips slightly parted, in an uncanny valley stare. Basic silence detection would cut during this freeze, which *technically* works but looks awful.
+Silero VAD's end timestamps are always a few frames too late. This means we're analyzing extra frames where the speaker is already quiet, potentially missing the perfect cut point.
 
-We solved this by adding a **post-speech analysis phase**. After Whisper identifies the last spoken word, SceneFlow keeps analyzing for another 2 seconds. It looks for the first frame where:
+**Our Fix: Energy-Based Refinement**
 
-1. The mouth fully closes
-2. The face settles into a neutral expression
-3. Motion drops to near-zero
-
-This tiny adjustment made generated videos look 10x more professional.
+We use VAD as a rough guide, then look backwards for a sudden energy drop (≥8 dB) in the audio. This drop marks the actual speech end, giving us frame-level precision and ensuring we never miss that ideal cut moment.
 
 ### The "Mid-Gesture" Problem
 
 Optical flow is great at detecting *large* motion, but bad at detecting *subtle* gestures. A speaker might be perfectly still from the waist up, but their hand is moving off-screen. Early versions of SceneFlow would happily cut during these moments, making the final frame look awkward.
 
 We fixed this by implementing **region-of-interest (ROI) weighting**. The algorithm gives more weight to motion near the speaker's face and less weight to the edges of the frame. Now it can distinguish between "speaker is gesturing" and "a car drove by in the background."
-
-### The Token Cost Problem
-
-Sending full video frames to GPT-4o or Claude is *expensive*. A single 1080p frame can be several hundred kilobytes. If you're analyzing 10-20 candidate frames, you're looking at $0.50-$1.00 per cut.
-
-We optimized this by:
-
-*   **Downscaling frames** to 512px width before sending to the AI (still enough detail to judge facial expressions).
-*   **Using context frames** instead of sending every frame (the AI doesn't need to see *every* second of the video to understand the flow).
-*   **Implementing early rejection** (if Whisper or optical flow already rules out a timestamp, we don't bother sending it to the AI).
-
 
 ## When to Use SceneFlow
 
@@ -101,18 +146,6 @@ SceneFlow is designed for high-quality, automated video workflows. It excels in 
 *   **AI Avatar Videos**: Perfect for cleaning up the awkward starts and stops of generated content from platforms like HeyGen or Synthesia.
 *   **Webinar & Podcast Clips**: Extracting short, punchy clips from long-form content without cutting off speakers mid-sentence.
 
-## How to Use It
-
-SceneFlow is built as a powerful CLI tool that fits right into your existing pipelines.
-
-Check out the project on GitHub: [https://github.com/vertexcover-io/sceneflow](https://github.com/vertexcover-io/sceneflow)
-
-### Basic Cut
-Cut a video at a specific timestamp, but let SceneFlow find the optimal spot nearby:
-
-```bash
-sceneflow cut single input.mp4 630.0 output.mp4 --mode balanced
-```
 
 ## See it in Action
 
@@ -135,14 +168,57 @@ Here's a comparison of a raw AI-generated video versus one processed by SceneFlo
   </div>
 </div>
 
-> **Note:** The video1 is the source video and the video2 is the resultent video after processing by SceneFlow.
+<div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '30px' }}>
+  <div style={{ textAlign: 'center' }}>
+    <p><strong>Before (Raw)</strong></p>
+    <video width="100%" style={{ maxWidth: '300px', borderRadius: '8px' }} controls>
+      <source src="/video/example_input2.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <div style={{ textAlign: 'center' }}>
+    <p><strong>After (SceneFlow)</strong></p>
+    <video width="100%" style={{ maxWidth: '300px', borderRadius: '8px' }} controls>
+      <source src="/video/example_output2.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+  </div>
+</div>
+
+<div style={{ display: 'flex', gap: '20px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '30px' }}>
+  <div style={{ textAlign: 'center' }}>
+    <p><strong>Before (Raw)</strong></p>
+    <video width="100%" style={{ maxWidth: '300px', borderRadius: '8px' }} controls>
+      <source src="/video/example_input3.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+  </div>
+  <div style={{ textAlign: 'center' }}>
+    <p><strong>After (SceneFlow)</strong></p>
+    <video width="100%" style={{ maxWidth: '300px', borderRadius: '8px' }} controls>
+      <source src="/video/example_output3.mp4" type="video/mp4" />
+      Your browser does not support the video tag.
+    </video>
+  </div>
+</div>
+
+## How to Use It
+
+SceneFlow is built as a powerful CLI tool that fits right into your existing pipelines.
+
+Check out the project on GitHub: [https://github.com/vertexcover-io/sceneflow](https://github.com/vertexcover-io/sceneflow)
+
+### Basic Cut
+Cut a video at a specific timestamp, but let SceneFlow find the optimal spot nearby:
+
+```bash
+sceneflow cut single input.mp4 630.0 output.mp4 --mode balanced
+```
 
 ## Conclusion
 
-"AI Video Editing" isn't just about throwing a video into an LLM. It's about building a robust pipeline where **Signal Processing** handles the precision (pixels, audio waves, motion vectors) and **Generative AI** handles the understanding (context, semantics, visual composition).
+SceneFlow works exceptionally well with AI-generated podcasts and talking head videos, delivering clean, professional cuts every time.
 
-The hardest part wasn't the AI, it was the *integration*. Making Whisper's word-level timestamps align with optical flow data, synchronizing facial landmark detection with frame extraction, and ensuring the multimodal AI receives exactly the right context at the right time.
-
-SceneFlow bridges this gap, giving you the scale of automation with the polish of a human editor. Whether you're processing 1 video or 10,000, every cut looks intentional.
+Our goal is to expand this into a comprehensive rough-cut tool for real-world podcasts, making it the go-to solution for automated video editing.
 
 The code is open source. Give it a spin and stop scrubbing through timelines manually.
