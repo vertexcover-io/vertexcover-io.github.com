@@ -208,11 +208,19 @@ SceneFlow is built as a powerful CLI tool that fits right into your existing pip
 
 Check out the project on GitHub: [https://github.com/vertexcover-io/sceneflow](https://github.com/vertexcover-io/sceneflow)
 
-### Basic Cut
-Cut a video at a specific timestamp, but let SceneFlow find the optimal spot nearby:
+### Basic Usage
+
+Find the optimal cut point in your video:
 
 ```bash
-sceneflow cut single input.mp4 630.0 output.mp4 --mode balanced
+# Find the best cut point timestamp
+sceneflow input.mp4
+
+# Save the trimmed video (requires ffmpeg)
+sceneflow input.mp4 --output cut_video.mp4
+
+# Get top 5 candidate cut points with scores
+sceneflow input.mp4 --top-n 5
 ```
 
 ## Conclusion
