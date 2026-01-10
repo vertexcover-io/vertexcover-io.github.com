@@ -37,3 +37,13 @@ automation:
   label: Automation
   permalink: /automation
   description: Automation
+
+web-scraping:
+  label: Web Scraping
+  permalink: /web-scraping
+  description: Web Scraping
+
+mcp:
+  label: MCP
+  permalink: /mcp
+  description: Model Context Protocol
