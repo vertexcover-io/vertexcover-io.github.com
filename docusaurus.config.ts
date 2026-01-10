@@ -16,20 +16,20 @@ const config: Config = {
 
   plugins: [
     "./src/plugins/tailwind-plugin.js",
-    [
-      '@docusaurus/plugin-content-blog',
-      {
-        id: 'learnings',
-        routeBasePath: 'learnings',
-        path: './learnings',
-        authorsMapPath: '../blog/authors.yml',
-        blogTitle: 'Learnings',
-        blogDescription: 'Weekly learnings from the Vertexcover team',
-        blogSidebarTitle: 'All learnings',
-        blogSidebarCount: 'ALL',
-        showReadingTime: true,
-      },
-    ],
+    // [
+    //   '@docusaurus/plugin-content-blog',
+    //   {
+    //     id: 'learnings',
+    //     routeBasePath: 'learnings',
+    //     path: './learnings',
+    //     authorsMapPath: '../blog/authors.yml',
+    //     blogTitle: 'Learnings',
+    //     blogDescription: 'Weekly learnings from the Vertexcover team',
+    //     blogSidebarTitle: 'All learnings',
+    //     blogSidebarCount: 'ALL',
+    //     showReadingTime: true,
+    //   },
+    // ],
   ],
   
 
@@ -45,7 +45,12 @@ const config: Config = {
   projectName: 'blog', // Usually your repo name.
 
   onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+
+  markdown: {
+    hooks: {
+      onBrokenMarkdownLinks: 'warn',
+    },
+  },
 
   // Even if you don't use internationalization, you can use this field to set
   // useful metadata like html lang. For example, if your site is Chinese, you
@@ -124,7 +129,7 @@ const config: Config = {
         // },
         {to: '/', label: 'Blog', position: 'left', exact: true},
         {to: '/projects', label: 'Projects', position: 'left'},
-        {to: '/learnings', label: 'Learnings', position: 'left'},
+        // {to: '/learnings', label: 'Learnings', position: 'left'},
         {to: '/about-us', label: 'About Us', position: 'left'},
         {
           href: 'https://github.com/vertexcover-io',
