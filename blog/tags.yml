@@ -17,3 +17,33 @@ infra:
   label: Infrastructure
   permalink: /infra
   description: Infrastructure
+
+video-processing:
+  label: Video Processing
+  permalink: /video-processing
+  description: Video Processing
+
+ai:
+  label: AI
+  permalink: /ai
+  description: Artificial Intelligence
+
+python:
+  label: Python
+  permalink: /python
+  description: Python Programming
+
+automation:
+  label: Automation
+  permalink: /automation
+  description: Automation
+
+web-scraping:
+  label: Web Scraping
+  permalink: /web-scraping
+  description: Web Scraping
+
+mcp:
+  label: MCP
+  permalink: /mcp
+  description: Model Context Protocol

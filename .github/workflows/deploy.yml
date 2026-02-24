@@ -15,7 +15,7 @@ jobs:
     steps:
      
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set Up Bun
         uses: oven-sh/setup-bun@v2
@@ -32,12 +32,12 @@ jobs:
         run: cp ./CNAME ./build/
       
       # setup github user and email to github bot
-      - uses: qoomon/actions--setup-git@v1
+      - uses: qoomon/actions--setup-git@v1.1.1
         with:
             user: bot
 
       - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v3
+        uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           publish_dir: ./build
