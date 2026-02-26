@@ -1,0 +1,275 @@
+---
+slug: "unified-ai-video-gateway"
+title: "Stop Rewriting Your AI Video Integrations Every Time You Switch Providers"
+date: 2026-02-24T00:00:00+00:00
+authors: [aksdev]
+tags: [python, ai, video-processing]
+draft: false
+---
+
+import TLDR from '@site/src/components/TLDR';
+
+<TLDR>
+
+Every AI video provider has its own SDK, its own parameter names, its own polling logic. **Tarash Gateway** gives you one interface for all of them. Switch providers with a config change, chain them together, and never rewrite an integration again.
+
+</TLDR>
+
+The AI video model space moves fast. Every few weeks there's a new model worth trying: better motion, better prompt adherence, better pricing. So we tried them all.
+
+Every switch meant the same work: different SDK, different parameter names, different polling logic, different error format. `duration_seconds` on one provider, `duration` on another, an enum string on a third. Each integration took a day. Each one was slightly different from the last in ways that didn't matter but had to be handled anyway.
+
+And when a provider went down, the pipeline went with it. No fallback, no graceful degradation. Just errors until someone manually switched.
+
+We weren't solving a new problem each time. So we built Tarash Gateway. We're [Vertexcover](https://vertexcover.io), and we build tooling for teams working with AI-generated video.
+
+{/* truncate */}
+
+## The Core Idea
+
+Your request never changes between providers. You have a prompt, a duration, an aspect ratio. You want a video back. The provider is just a detail.
+
+Tarash Gateway makes that literal. `VideoGenerationRequest` holds your intent. `VideoGenerationConfig` holds the provider. Swap the config and the rest of your code stays the same.
+
+```python
+from tarash.tarash_gateway import generate_video, VideoGenerationConfig, VideoGenerationRequest
+
+request = VideoGenerationRequest(
+    prompt="A calm lake at sunrise, mist rising off the water",
+    duration_seconds=4,
+    aspect_ratio="16:9",
+)
+
+fal_config    = VideoGenerationConfig(provider="fal",    model="fal-ai/veo3.1", api_key="YOUR_FAL_KEY")
+
+# Same request, different config. No other changes needed.
+response = generate_video(fal_config, request)
+print(response.video)  # URL to the generated video
+```
+
+Polling, retries, and timeout handling are all managed internally. The call blocks until generation completes, with optional progress callbacks if you need visibility into the wait.
+
+## Fal: every model, one interface
+
+Fal is unique in how many frontier models it hosts. As far as we know, Tarash Gateway is the only Python library that exposes all of them through a single interface. You don't write a new integration per model:
+
+**Video:** Veo3.1, Veo3, Minimax, Kling v2.6, Kling O1, Sora-2, Wan v2.5, Wan v2.2, Bytedance Seedance, Pixverse v5.5 and more (10+ frontier video models).
+
+**Image:** Flux (all variants), Flux 2, Recraft v3, Ideogram, z-image-turbo and more.
+
+Model variants (image-to-video, first-last-frame, extend-video, motion-control) work with the same request interface. Pass the full variant path as your model string (e.g. `fal-ai/veo3.1/fast/image-to-video`). Field translation happens automatically.
+
+## Adding a new Fal model in one command
+
+For Fal models specifically, we built a [Claude Code](https://claude.ai/code) automation script that handles the entire integration. Run one command in your terminal, and it:
+
+1. Fetches the model documentation from fal.ai
+2. Generates the field mappers (translating your standard params to Fal's expected format)
+3. Registers the model in the registry
+4. Writes unit and e2e tests
+5. Runs them
+
+## Can I use it simply?
+
+### Installation
+
+```bash
+# Start with fal if you want the widest model selection
+pip install tarash-gateway[fal]
+
+# Or install for a specific provider
+pip install tarash-gateway[openai]
+pip install tarash-gateway[replicate]
+
+# Or install the base package without any provider extras
+pip install tarash-gateway
+```
+
+### Generate a video
+
+```python
+from tarash.tarash_gateway import generate_video, VideoGenerationConfig, VideoGenerationRequest
+
+config = VideoGenerationConfig(
+    provider="fal",
+    model="fal-ai/veo3.1",
+    api_key="YOUR_FAL_KEY",
+)
+request = VideoGenerationRequest(
+    prompt="A calm lake at sunrise, mist rising off the water",
+    duration_seconds=4,
+    aspect_ratio="16:9",
+)
+
+response = generate_video(config, request)
+print(response.video)  # Direct URL to the generated video
+```
+
+Pass an optional `on_progress` callback to get status updates during the wait.
+
+All generation functions have async equivalents (`generate_video_async`, `generate_image_async`) with the same signature.
+
+Since the request never changes, comparing providers means iterating a list of configs with the same prompt and no extra plumbing.
+
+### Image generation
+
+The same pattern works for images, with the same support for fallback chains, mock mode, and extra params. Five providers: Fal, Replicate, OpenAI, Google, and Stability.
+
+```python
+from tarash.tarash_gateway import generate_image, ImageGenerationConfig, ImageGenerationRequest
+
+config = ImageGenerationConfig(
+    provider="fal",
+    model="fal-ai/flux/dev",
+    api_key="YOUR_FAL_KEY",
+)
+request = ImageGenerationRequest(
+    prompt="A calm lake at sunrise, mist rising off the water",
+    aspect_ratio="16:9",
+)
+
+response = generate_image(config, request)
+print(response.images[0])  # URL to the generated image
+```
+
+## What if I need provider-specific control?
+
+The standard interface covers what most requests need. For model-specific parameters, pass them in `extra_params` and Tarash forwards them to the provider without modification. The parameter names come from each provider's own API docs:
+
+```python
+request = VideoGenerationRequest(
+    prompt="A stormy ocean at night",
+    duration_seconds=5,
+    aspect_ratio="16:9",
+    extra_params={
+        "motion_mode": "normal",           # Kling-specific, from fal.ai/models/kling docs
+    },
+)
+
+response = generate_video(config, request)
+print(response.raw_response)  # Full unmodified provider response, if you need it
+```
+
+## What if a provider goes down?
+
+Providers go down. Rate limits hit. Define a priority order upfront and Tarash handles retries and failover silently:
+
+```python
+config = VideoGenerationConfig(
+    provider="fal",
+    model="fal-ai/veo3.1",
+    api_key=FAL_KEY,
+    fallback_configs=[
+        VideoGenerationConfig(provider="replicate", model="google/veo-3",  api_key=REPLICATE_KEY),
+        VideoGenerationConfig(provider="openai",    model="sora-2-turbo", api_key=OPENAI_KEY),
+    ],
+)
+
+response = generate_video(config, request)
+# Fal first. Replicate if Fal fails. OpenAI if Replicate fails. You don't handle any of it.
+```
+
+All exceptions are subclasses of `TarashException` and carry structured context: provider name, model, request ID, and the raw provider response. `TimeoutError`, `GenerationFailedError`, and `HTTPError` with 5xx status codes are retryable and trigger automatic failover when fallback configs are set.
+
+Every response includes `execution_metadata`, a full audit trail of what happened across the chain:
+
+```python
+meta = response.execution_metadata
+
+print(meta.total_attempts)        # how many providers were tried
+print(meta.fallback_triggered)    # True if any fallback fired
+print(meta.total_elapsed_seconds) # wall-clock time for the entire chain
+
+for attempt in meta.attempts:
+    print(attempt.provider, attempt.status, attempt.elapsed_seconds)
+    if attempt.error_message:
+        print(attempt.error_message)  # why this provider failed
+```
+
+If a request silently fell back to a secondary provider, or took 3 minutes across two failing attempts, this tells you exactly what happened.
+
+## How do I develop without paying for every test run?
+
+Video and image generation costs real money per call. During development, you want to build and test your pipeline without burning credits on every iteration.
+
+Add `mock=MockConfig(enabled=True)` to any config. No API calls, instant responses, zero cost:
+
+```python
+from tarash.tarash_gateway.mock import MockConfig
+
+config = VideoGenerationConfig(
+    provider="fal",
+    model="fal-ai/veo3.1",
+    api_key="not-needed",
+    mock=MockConfig(enabled=True),
+)
+
+response = generate_video(config, request)
+print(response.is_mock)  # True
+print(response.video)    # Realistic mock video URL
+```
+
+Remove `mock=MockConfig(enabled=True)` to switch back to the real provider. Everything else stays the same.
+
+You can also simulate failures. Pass a list of weighted `MockResponse` objects to control what gets returned, including specific exceptions:
+
+```python
+from tarash.tarash_gateway.exceptions import HTTPError
+from tarash.tarash_gateway.mock import MockConfig, MockResponse
+
+config = VideoGenerationConfig(
+    provider="fal",
+    model="fal-ai/veo3.1",
+    api_key="not-needed",
+    mock=MockConfig(
+        enabled=True,
+        responses=[
+            MockResponse(weight=0.8),  # success 80% of the time
+            MockResponse(weight=0.2, error=HTTPError("Rate limit", provider="fal", status_code=429)),
+        ],
+    ),
+)
+```
+
+This is useful for testing your fallback logic and error handling paths without spending credits.
+
+
+## What if you don't support my provider?
+
+### Register a custom handler at runtime
+
+Implement the `ProviderHandler` protocol and register it. It plugs directly into fallback chains, progress callbacks, and the unified response format:
+
+```python
+from tarash.tarash_gateway import generate_video, VideoGenerationConfig
+from tarash.tarash_gateway.registry import register_provider
+from tarash.tarash_gateway.models import VideoGenerationResponse
+
+class MyCustomHandler:
+    def generate_video(self, config, request, on_progress=None) -> VideoGenerationResponse:
+        # Your implementation
+        ...
+
+    async def generate_video_async(self, config, request, on_progress=None) -> VideoGenerationResponse:
+        # Your async implementation
+        ...
+
+register_provider("my-provider", MyCustomHandler())
+
+config = VideoGenerationConfig(provider="my-provider", model="my-model", api_key="key")
+response = generate_video(config, request)
+```
+
+## Get Started
+
+```bash
+pip install tarash-gateway[fal]
+```
+
+Source and full docs: [github.com/vertexcover-io/tarash](https://github.com/vertexcover-io/tarash)
+
+---
+
+The AI video space will keep moving. New models every few weeks, providers going down, pricing shifting. The integrations you write today will need to change.
+
+Tarash Gateway doesn't solve which model to use. It solves the cost of switching. Write the request once, move between providers freely, and spend the time you would have spent re-integrating on the work that actually matters.
