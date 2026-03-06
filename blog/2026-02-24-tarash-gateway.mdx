@@ -1,9 +1,9 @@
 ---
-slug: "unified-ai-video-gateway"
-title: "Stop Rewriting Your AI Video Integrations Every Time You Switch Providers"
+slug: "unified-ai-media-gateway"
+title: "Stop Rewriting Your AI Media Integrations Every Time You Switch Providers"
 date: 2026-02-24T00:00:00+00:00
 authors: [aksdev]
-tags: [python, ai, video-processing]
+tags: [python, ai, media-generation]
 draft: false
 ---
 
@@ -11,25 +11,25 @@ import TLDR from '@site/src/components/TLDR';
 
 <TLDR>
 
-Every AI video provider has its own SDK, its own parameter names, its own polling logic. **Tarash Gateway** gives you one interface for all of them. Switch providers with a config change, chain them together, and never rewrite an integration again.
+Every AI media provider has its own SDK, its own parameter names, its own polling logic. **Tarash Gateway** gives you one interface for all of them. Switch providers with a config change, chain them together, and never rewrite an integration again.
 
 </TLDR>
 
-The AI video model space moves fast. Every few weeks there's a new model worth trying: better motion, better prompt adherence, better pricing. So we tried them all.
+The AI media generation space moves fast. Every few weeks there's a new model worth trying: better motion, better prompt adherence, better pricing. So we tried them all.
 
 Every switch meant the same work: different SDK, different parameter names, different polling logic, different error format. `duration_seconds` on one provider, `duration` on another, an enum string on a third. Each integration took a day. Each one was slightly different from the last in ways that didn't matter but had to be handled anyway.
 
 And when a provider went down, the pipeline went with it. No fallback, no graceful degradation. Just errors until someone manually switched.
 
-We weren't solving a new problem each time. So we built Tarash Gateway. We're [Vertexcover](https://vertexcover.io), and we build tooling for teams working with AI-generated video.
+We weren't solving a new problem each time. So we built Tarash Gateway. We're [Vertexcover](https://vertexcover.io), and we build tooling for teams working with AI-generated media.
 
 {/* truncate */}
 
 ## The Core Idea
 
-Your request never changes between providers. You have a prompt, a duration, an aspect ratio. You want a video back. The provider is just a detail.
+Your request never changes between providers. You have a prompt, a duration, an aspect ratio. You want media back—video or image. The provider is just a detail.
 
-Tarash Gateway makes that literal. `VideoGenerationRequest` holds your intent. `VideoGenerationConfig` holds the provider. Swap the config and the rest of your code stays the same.
+Tarash Gateway makes that literal. `VideoGenerationRequest` and `ImageGenerationRequest` hold your intent. The config holds the provider. Swap the config and the rest of your code stays the same.
 
 ```python
 from tarash.tarash_gateway import generate_video, VideoGenerationConfig, VideoGenerationRequest
@@ -47,11 +47,26 @@ response = generate_video(fal_config, request)
 print(response.video)  # URL to the generated video
 ```
 
+The same pattern works for images:
+
+```python
+from tarash.tarash_gateway import generate_image, ImageGenerationConfig, ImageGenerationRequest
+
+request = ImageGenerationRequest(
+    prompt="A calm lake at sunrise, mist rising off the water",
+    aspect_ratio="16:9",
+)
+
+config = ImageGenerationConfig(provider="fal", model="fal-ai/flux/dev", api_key="YOUR_FAL_KEY")
+response = generate_image(config, request)
+print(response.images[0])  # URL to the generated image
+```
+
 Polling, retries, and timeout handling are all managed internally. The call blocks until generation completes, with optional progress callbacks if you need visibility into the wait.
 
 ## Fal: every model, one interface
 
-Fal is unique in how many frontier models it hosts. As far as we know, Tarash Gateway is the only Python library that exposes all of them through a single interface. You don't write a new integration per model:
+Fal is unique in how many frontier models it hosts—both video and image. As far as we know, Tarash Gateway is the only Python library that exposes all of them through a single interface. You don't write a new integration per model:
 
 **Video:** Veo3.1, Veo3, Minimax, Kling v2.6, Kling O1, Sora-2, Wan v2.5, Wan v2.2, Bytedance Seedance, Pixverse v5.5 and more (10+ frontier video models).
 
@@ -113,7 +128,7 @@ Since the request never changes, comparing providers means iterating a list of c
 
 ### Image generation
 
-The same pattern works for images, with the same support for fallback chains, mock mode, and extra params. Five providers: Fal, Replicate, OpenAI, Google, and Stability.
+As shown in the Core Idea section, the same pattern works for images, with the same support for fallback chains, mock mode, and extra params. Five providers: Fal, Replicate, OpenAI, Google, and Stability.
 
 ```python
 from tarash.tarash_gateway import generate_image, ImageGenerationConfig, ImageGenerationRequest
@@ -270,6 +285,6 @@ Source and full docs: [github.com/vertexcover-io/tarash](https://github.com/vert
 
 ---
 
-The AI video space will keep moving. New models every few weeks, providers going down, pricing shifting. The integrations you write today will need to change.
+The AI media generation space will keep moving. New models every few weeks, providers going down, pricing shifting. The integrations you write today will need to change.
 
 Tarash Gateway doesn't solve which model to use. It solves the cost of switching. Write the request once, move between providers freely, and spend the time you would have spent re-integrating on the work that actually matters.
