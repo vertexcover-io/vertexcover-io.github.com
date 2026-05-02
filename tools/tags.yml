@@ -1,0 +1,24 @@
+tools:
+  label: Tools
+  permalink: /tools-tag
+  description: LLM-built utilities
+
+cli:
+  label: CLI
+  permalink: /cli
+  description: Command-line tools
+
+claude:
+  label: Claude
+  permalink: /claude
+  description: Claude / Anthropic-powered tooling
+
+bash:
+  label: Bash
+  permalink: /bash
+  description: Bash and shell scripting
+
+bookmarks:
+  label: Bookmarks
+  permalink: /bookmarks
+  description: Bookmark management
