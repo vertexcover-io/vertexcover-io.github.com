@@ -47,3 +47,13 @@ mcp:
   label: MCP
   permalink: /mcp
   description: Model Context Protocol
+
+containers:
+  label: Containers
+  permalink: /containers
+  description: Container runtimes, OCI images, and orchestration
+
+performance:
+  label: Performance
+  permalink: /performance
+  description: Performance engineering and optimization
