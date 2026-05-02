@@ -47,6 +47,40 @@
   --comparison-border: rgba(255, 255, 255, 0.2);
 }
 
+/* Blog post images: fill the content column, rounded corners */
+article .markdown img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  margin: 1.5rem auto;
+}
+
+/* Wide image figure: full column width, click to zoom (lightbox). */
+.wide-image {
+  margin: 2rem 0;
+  width: 100%;
+}
+.wide-image img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+  cursor: zoom-in;
+}
+.wide-image figcaption {
+  font-size: 0.85rem;
+  color: var(--ifm-color-emphasis-700);
+  text-align: center;
+  margin-top: 0.5rem;
+  font-style: italic;
+}
+
+/* Zoom overlay backdrop — matches dark mode */
+[data-rmiz-modal-overlay='visible'] {
+  background-color: rgba(0, 0, 0, 0.85) !important;
+}
+
 @keyframes fall {
   from {
     opacity: 1;
