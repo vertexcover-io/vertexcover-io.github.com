@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[8315],{6973:e=>{e.exports=JSON.parse('{"title":"All tools","items":[{"title":"pin","permalink":"/tools/pin","unlisted":false,"date":"2026-05-02T06:32:40.000Z"},{"title":"aibash","permalink":"/tools/aibash","unlisted":false,"date":"2026-05-02T06:05:10.000Z"}]}')}}]);

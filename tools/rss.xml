@@ -1,0 +1,128 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
+    <channel>
+        <title>Blog - Vertexcover Blog</title>
+        <link>https://blog.vertexcover.io/tools</link>
+        <description>Blog - Vertexcover Blog</description>
+        <lastBuildDate>Sat, 02 May 2026 06:32:40 GMT</lastBuildDate>
+        <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
+        <generator>https://github.com/jpmonette/feed</generator>
+        <language>en</language>
+        <item>
+            <title><![CDATA[pin]]></title>
+            <link>https://blog.vertexcover.io/tools/pin</link>
+            <guid>https://blog.vertexcover.io/tools/pin</guid>
+            <pubDate>Sat, 02 May 2026 06:32:40 GMT</pubDate>
+            <description><![CDATA[A SQLite-backed CLI bookmark manager with nested folders, tags, and Claude-powered natural-language add/search — describe a bookmark in English and Claude fetches the page, infers metadata, and files it; search by intent ("that ml paper about attention") and the matched URL goes straight to the clipboard.]]></description>
+            <content:encoded><![CDATA[<div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 my-5 border-l-4 border-l-blue-500 dark:border-l-blue-400"><strong class="text-blue-600 dark:text-blue-400 text-sm uppercase tracking-wide font-semibold">TL;DR:</strong><div class="mt-2 text-gray-800 dark:text-gray-200"><p>A SQLite-backed CLI bookmark manager with nested folders, tags, and Claude-powered natural-language add/search — describe a bookmark in English and Claude fetches the page, infers metadata, and files it; search by intent ("that ml paper about attention") and the matched URL goes straight to the clipboard.</p></div></div>
+<p>A CLI bookmark manager with <strong>Claude-powered natural-language add and search</strong>.</p>
+<p>Bookmark URLs with names, descriptions, tags, and nested folders. Find them with plain English (<code>pin find "that ml paper about attention"</code>) and the matched URL goes straight to your clipboard.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="requirements">Requirements<a href="https://blog.vertexcover.io/tools/pin#requirements" class="hash-link" aria-label="Direct link to Requirements" title="Direct link to Requirements" translate="no">​</a></h2>
+<ul>
+<li class=""><code>claude</code> CLI installed and authenticated (powers NLP add/search — no API key needed beyond your Claude Code login).</li>
+<li class=""><code>uv</code> for running the script.</li>
+<li class="">Optional: <code>fzf</code> for picker mode, <code>pbcopy</code> (macOS) / <code>xclip</code> / <code>wl-copy</code> for clipboard.</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="storage">Storage<a href="https://blog.vertexcover.io/tools/pin#storage" class="hash-link" aria-label="Direct link to Storage" title="Direct link to Storage" translate="no">​</a></h2>
+<p>Default DB lives at <code>~/.local/share/pin/pin.db</code> (XDG-compliant). Override with <code>$PIN_DB</code> or <code>--db &lt;path&gt;</code>.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="quick-start">Quick start<a href="https://blog.vertexcover.io/tools/pin#quick-start" class="hash-link" aria-label="Direct link to Quick start" title="Direct link to Quick start" translate="no">​</a></h2>
+<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain"># Make a folder</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py mkdir dev/python --desc "python stuff"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Add a bookmark with manual fields</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py add "https://docs.python.org/3/library/asyncio.html" \</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">    --name "asyncio docs" --tags "python,async" --folder dev/python</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Add with --auto: Claude fetches the page, generates name/desc/tags, and picks/proposes a folder</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py add "https://docs.python.org/3/library/itertools.html" --auto</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Add with natural language: a freeform second arg that Claude parses</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py add "https://arxiv.org/abs/1706.03762" "the original transformers paper, save under reading"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Or just one freeform string with the URL embedded</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py add "save https://github.com/astral-sh/uv as a python tooling reference"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># List everything as a tree</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py ls</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Find by NLP — single match goes straight to clipboard</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py find "that ml paper about attention"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Plain substring search instead</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py find --plain "asyncio"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Pick from all bookmarks with fzf</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py find --fzf</span><br></span></code></pre></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="commands">Commands<a href="https://blog.vertexcover.io/tools/pin#commands" class="hash-link" aria-label="Direct link to Commands" title="Direct link to Commands" translate="no">​</a></h2>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="add-url-natural-language"><code>add &lt;url&gt; [natural-language]</code><a href="https://blog.vertexcover.io/tools/pin#add-url-natural-language" class="hash-link" aria-label="Direct link to add-url-natural-language" title="Direct link to add-url-natural-language" translate="no">​</a></h3>
+<p>Add a bookmark.</p>
+<ul>
+<li class=""><strong>First arg is a URL</strong> + manual flags → simple insert.</li>
+<li class=""><strong>First arg is a URL</strong> + second freeform arg → Claude parses the description for name/desc/tags/folder.</li>
+<li class=""><strong>First arg is freeform text</strong> containing a URL → Claude extracts everything.</li>
+<li class=""><strong><code>--auto</code></strong> with a URL only → Claude fetches the page and generates metadata.</li>
+</ul>
+<p>Flags:</p>
+<table><thead><tr><th>Flag</th><th>Purpose</th></tr></thead><tbody><tr><td><code>--name</code></td><td>Bookmark name</td></tr><tr><td><code>--desc</code></td><td>Description</td></tr><tr><td><code>--tags</code></td><td>Comma-separated tags</td></tr><tr><td><code>--folder</code></td><td>Folder path; created if missing (e.g. <code>dev/python/async</code>)</td></tr><tr><td><code>--auto</code></td><td>Fetch the URL and let Claude generate name/desc/tags/folder</td></tr></tbody></table>
+<p>Folders referenced via <code>--folder</code> or inferred by Claude that don't exist yet are created automatically. When using NLP, Claude is shown the existing folder tree and prefers an existing folder if one fits.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="mkdir-path"><code>mkdir &lt;path&gt;</code><a href="https://blog.vertexcover.io/tools/pin#mkdir-path" class="hash-link" aria-label="Direct link to mkdir-path" title="Direct link to mkdir-path" translate="no">​</a></h3>
+<p>Create a folder. Nested paths work (<code>dev/python/async</code>). <code>--desc</code> adds a folder description that Claude sees during NLP add.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="ls-path"><code>ls [path]</code><a href="https://blog.vertexcover.io/tools/pin#ls-path" class="hash-link" aria-label="Direct link to ls-path" title="Direct link to ls-path" translate="no">​</a></h3>
+<p>Tree view of folders and bookmarks. Optional <code>path</code> to limit to a subtree.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="find-query"><code>find [query]</code><a href="https://blog.vertexcover.io/tools/pin#find-query" class="hash-link" aria-label="Direct link to find-query" title="Direct link to find-query" translate="no">​</a></h3>
+<p>Search bookmarks. Default is <strong>NLP via Claude</strong> (matches on intent, not just substrings).</p>
+<table><thead><tr><th>Flag</th><th>Purpose</th></tr></thead><tbody><tr><td><code>--plain</code></td><td>Literal substring match on name/desc/tags/url</td></tr><tr><td><code>--fzf</code></td><td>Force the fzf picker even on a single match (or use alone with no query to browse all)</td></tr><tr><td><code>--print</code></td><td>Print URL instead of copying to clipboard</td></tr><tr><td><code>--open</code></td><td>Open in the default browser</td></tr><tr><td><code>--list</code></td><td>Print every match (no copy/open)</td></tr></tbody></table>
+<p>Behavior:</p>
+<ul>
+<li class=""><strong>One match</strong> → URL goes straight to your clipboard.</li>
+<li class=""><strong>Multiple matches</strong> → fzf picker; pick one, URL goes to clipboard.</li>
+<li class=""><code>--print</code> / <code>--open</code> / <code>--list</code> change the action on the chosen bookmark.</li>
+</ul>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="rm-idpath"><code>rm &lt;id|path&gt;</code><a href="https://blog.vertexcover.io/tools/pin#rm-idpath" class="hash-link" aria-label="Direct link to rm-idpath" title="Direct link to rm-idpath" translate="no">​</a></h3>
+<p>Delete a bookmark by ID or a folder by path. Folders containing bookmarks/subfolders prompt for confirmation; <code>-y</code> skips.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="mv-id-folder-path"><code>mv &lt;id&gt; &lt;folder-path&gt;</code><a href="https://blog.vertexcover.io/tools/pin#mv-id-folder-path" class="hash-link" aria-label="Direct link to mv-id-folder-path" title="Direct link to mv-id-folder-path" translate="no">​</a></h3>
+<p>Move a bookmark to another folder (created if missing).</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="edit-id"><code>edit &lt;id&gt;</code><a href="https://blog.vertexcover.io/tools/pin#edit-id" class="hash-link" aria-label="Direct link to edit-id" title="Direct link to edit-id" translate="no">​</a></h3>
+<p>Update fields: <code>--name</code>, <code>--desc</code>, <code>--tags</code>, <code>--url</code>.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="export--import"><code>export</code> / <code>import</code><a href="https://blog.vertexcover.io/tools/pin#export--import" class="hash-link" aria-label="Direct link to export--import" title="Direct link to export--import" translate="no">​</a></h3>
+<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py export --out backup.json</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./pin.py import --file backup.json</span><br></span></code></pre></div></div>
+<p>JSON dump/load of the entire bookmark database. Handy for backup or syncing across machines.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="global-flags">Global flags<a href="https://blog.vertexcover.io/tools/pin#global-flags" class="hash-link" aria-label="Direct link to Global flags" title="Direct link to Global flags" translate="no">​</a></h2>
+<table><thead><tr><th>Flag</th><th>Purpose</th></tr></thead><tbody><tr><td><code>--db &lt;path&gt;</code></td><td>Use a non-default DB file (also via <code>$PIN_DB</code>)</td></tr><tr><td><code>--model &lt;id&gt;</code></td><td>Override the Claude model (default: <code>sonnet</code>)</td></tr></tbody></table>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="how-nlp-works">How NLP works<a href="https://blog.vertexcover.io/tools/pin#how-nlp-works" class="hash-link" aria-label="Direct link to How NLP works" title="Direct link to How NLP works" translate="no">​</a></h2>
+<p>Both NLP add and NLP search shell out to <code>claude -p</code> with:</p>
+<ul>
+<li class="">A system prompt constraining the model to JSON-only output.</li>
+<li class="">A <code>--json-schema</code> for structured output.</li>
+<li class="">All built-in Claude tools (<code>Bash</code>, <code>Read</code>, <code>WebFetch</code>, etc.) disabled — the model answers from the context we provide (page metadata, existing folder list, bookmark list).</li>
+<li class=""><code>--setting-sources ""</code> so user hooks don't interfere.</li>
+</ul>
+<p>For <strong>add</strong>, Claude sees: the URL, scraped page title/description, your freeform text (if any), and the full existing folder tree.
+For <strong>find</strong>, Claude sees: the user query and a JSON dump of every bookmark (id, name, desc, tags, folder, URL), then returns ranked IDs.</p>
+<hr>
+<p><em>Source: <a href="https://github.com/vertexcover-io/vibe-tools/tree/master/pin" target="_blank" rel="noopener noreferrer" class="">github.com/vertexcover-io/vibe-tools/tree/master/pin</a></em></p>]]></content:encoded>
+            <category>Tools</category>
+            <category>Claude</category>
+            <category>CLI</category>
+            <category>Bookmarks</category>
+        </item>
+        <item>
+            <title><![CDATA[aibash]]></title>
+            <link>https://blog.vertexcover.io/tools/aibash</link>
+            <guid>https://blog.vertexcover.io/tools/aibash</guid>
+            <pubDate>Sat, 02 May 2026 06:05:10 GMT</pubDate>
+            <description><![CDATA[Translates an English description into a concrete bash command using the Claude CLI, with the current directory's file listing passed as context so requests like "delete the largest file" resolve to real filenames. Optionally copies the result to the clipboard or executes it after a confirmation prompt.]]></description>
+            <content:encoded><![CDATA[<div class="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 my-5 border-l-4 border-l-blue-500 dark:border-l-blue-400"><strong class="text-blue-600 dark:text-blue-400 text-sm uppercase tracking-wide font-semibold">TL;DR:</strong><div class="mt-2 text-gray-800 dark:text-gray-200"><p>Translates an English description into a concrete bash command using the Claude CLI, with the current directory's file listing passed as context so requests like "delete the largest file" resolve to real filenames. Optionally copies the result to the clipboard or executes it after a confirmation prompt.</p></div></div>
+<p>Turn an English description into a bash command, using the Claude Code CLI as the LLM.</p>
+<p>The script lists files in the current directory (with sizes and creation/modification times) and passes that listing as context, so requests like "copy the most recently created CSV" or "delete the largest file" can be resolved to concrete filenames without you having to type them.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="requirements">Requirements<a href="https://blog.vertexcover.io/tools/aibash#requirements" class="hash-link" aria-label="Direct link to Requirements" title="Direct link to Requirements" translate="no">​</a></h2>
+<ul>
+<li class=""><code>claude</code> CLI installed and authenticated (this is what powers the translation — no API key needed beyond your Claude Code login).</li>
+<li class=""><code>uv</code> for running the script with PEP 723 inline metadata.</li>
+<li class="">Optional: <code>fzf</code> for <code>--pick</code>, <code>pbcopy</code> (macOS) / <code>xclip</code> / <code>wl-copy</code> for <code>--copy</code>.</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="usage">Usage<a href="https://blog.vertexcover.io/tools/aibash#usage" class="hash-link" aria-label="Direct link to Usage" title="Direct link to Usage" translate="no">​</a></h2>
+<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain">./aibash.py "copy the most recently created csv to backup.csv"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># → cp newest.csv backup.csv</span><br></span></code></pre></div></div>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="flags">Flags<a href="https://blog.vertexcover.io/tools/aibash#flags" class="hash-link" aria-label="Direct link to Flags" title="Direct link to Flags" translate="no">​</a></h3>
+<table><thead><tr><th>Flag</th><th>What it does</th></tr></thead><tbody><tr><td><code>--pick</code></td><td>Open <code>fzf</code> to pre-select a file from the current directory. The picked file is passed to the LLM as the authoritative source.</td></tr><tr><td><code>-c</code>, <code>--copy</code></td><td>Copy the generated command to the system clipboard (<code>pbcopy</code> / <code>xclip</code> / <code>wl-copy</code>).</td></tr><tr><td><code>-r</code>, <code>--run</code></td><td>Execute the generated command after a <code>[y/N]</code> confirmation.</td></tr><tr><td><code>-y</code>, <code>--yes</code></td><td>Execute the command immediately without confirmation. Implies <code>--run</code>.</td></tr><tr><td><code>-v</code>, <code>--verbose</code></td><td>Print diagnostic info — the picked file, clipboard tool used, and command being run. Off by default.</td></tr><tr><td><code>--dir &lt;path&gt;</code></td><td>List files from a directory other than <code>cwd</code>.</td></tr><tr><td><code>--model &lt;id&gt;</code></td><td>Override the Claude model. Defaults to <code>sonnet</code> (latest sonnet).</td></tr></tbody></table>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="examples">Examples<a href="https://blog.vertexcover.io/tools/aibash#examples" class="hash-link" aria-label="Direct link to Examples" title="Direct link to Examples" translate="no">​</a></h3>
+<div class="language-bash codeBlockContainer_Ckt0 theme-code-block" style="--prism-color:#393A34;--prism-background-color:#f6f8fa"><div class="codeBlockContent_QJqH"><pre tabindex="0" class="prism-code language-bash codeBlock_bY9V thin-scrollbar" style="color:#393A34;background-color:#f6f8fa"><code class="codeBlockLines_e6Vv"><span class="token-line" style="color:#393A34"><span class="token plain"># Print the command only.</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./aibash.py "make a tarball of all csv files called data.tar.gz"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Pick a file with fzf, then describe what to do with it.</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./aibash.py --pick "rename this file to backup.txt"</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain" style="display:inline-block"></span><br></span><span class="token-line" style="color:#393A34"><span class="token plain"># Generate, copy to clipboard, and auto-run.</span><br></span><span class="token-line" style="color:#393A34"><span class="token plain">./aibash.py -c -y "delete every .log file older than 7 days"</span><br></span></code></pre></div></div>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="output">Output<a href="https://blog.vertexcover.io/tools/aibash#output" class="hash-link" aria-label="Direct link to Output" title="Direct link to Output" translate="no">​</a></h2>
+<ul>
+<li class=""><strong>Without <code>--run</code>/<code>--yes</code>:</strong> the generated command is printed to <strong>stdout</strong> and nothing else (so you can pipe it to <code>bash</code> if you want).</li>
+<li class=""><strong>With <code>--run</code>/<code>--yes</code>:</strong> the command is executed via <code>os.execvp</code> and the command's own output is what you see — <code>aibash</code> adds no chatter of its own.</li>
+<li class=""><code>--verbose</code> adds diagnostic lines to <strong>stderr</strong> (picked file, clipboard tool, command being run before exec).</li>
+<li class="">Real errors (clipboard tool missing, ambiguous request, etc.) always go to stderr regardless of verbosity.</li>
+</ul>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="how-it-works">How it works<a href="https://blog.vertexcover.io/tools/aibash#how-it-works" class="hash-link" aria-label="Direct link to How it works" title="Direct link to How it works" translate="no">​</a></h2>
+<p><code>aibash</code> shells out to <code>claude -p</code> with:</p>
+<ul>
+<li class="">A small system prompt that constrains the model to output a JSON object with <code>command</code> and <code>notes</code> fields.</li>
+<li class="">A <code>--json-schema</code> for structured output.</li>
+<li class="">The current directory's file listing (name, size, creation time, modification time).</li>
+<li class="">All built-in tools (<code>Bash</code>, <code>Read</code>, etc.) disabled, so the model answers from the provided listing without trying to verify with shell calls.</li>
+<li class=""><code>--setting-sources ""</code> so user-level hooks don't inject content into the response.</li>
+</ul>
+<hr>
+<p><em>Source: <a href="https://github.com/vertexcover-io/vibe-tools/tree/master/aibash" target="_blank" rel="noopener noreferrer" class="">github.com/vertexcover-io/vibe-tools/tree/master/aibash</a></em></p>]]></content:encoded>
+            <category>Tools</category>
+            <category>Claude</category>
+            <category>Bash</category>
+            <category>CLI</category>
+        </item>
+    </channel>
+</rss>

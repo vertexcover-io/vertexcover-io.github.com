@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[356],{1475:e=>{e.exports=JSON.parse('{"metadata":{"permalink":"/tools","page":1,"postsPerPage":10,"totalPages":1,"totalCount":2,"blogDescription":"LLM-built utilities \u2014 small, single-purpose, every line written by a coding agent.","blogTitle":"Tools"}}')}}]);
