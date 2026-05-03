@@ -57,3 +57,23 @@ performance:
   label: Performance
   permalink: /performance
   description: Performance engineering and optimization
+
+cli:
+  label: CLI
+  permalink: /cli
+  description: Command-line tools
+
+claude:
+  label: Claude
+  permalink: /claude
+  description: Claude / Anthropic-powered tooling
+
+bookmarks:
+  label: Bookmarks
+  permalink: /bookmarks
+  description: Bookmark management
+
+bash:
+  label: Bash
+  permalink: /bash
+  description: Bash and shell scripting
