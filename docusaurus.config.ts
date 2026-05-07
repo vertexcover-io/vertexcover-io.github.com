@@ -33,6 +33,27 @@ const config: Config = {
         onUntruncatedBlogPosts: 'ignore',
       },
     ],
+    [
+      '@docusaurus/plugin-content-blog',
+      {
+        id: 'harness-engineering',
+        routeBasePath: 'harness-engineering',
+        path: './harness-engineering',
+        authorsMapPath: '../blog/authors.yml',
+        blogTitle: 'Harness Engineering',
+        blogDescription: 'Findings, experiments, and field notes on harness engineering',
+        blogSidebarTitle: 'All posts',
+        blogSidebarCount: 'ALL',
+        showReadingTime: true,
+        feedOptions: {
+          type: ['rss', 'atom'],
+          xslt: true,
+        },
+        onInlineTags: 'warn',
+        onInlineAuthors: 'warn',
+        onUntruncatedBlogPosts: 'warn',
+      },
+    ],
     // Re-enable when the first exploration post is ready.
     // [
     //   '@docusaurus/plugin-content-blog',
@@ -151,6 +172,7 @@ const config: Config = {
         {to: '/', label: 'Blog', position: 'left', exact: true},
         {to: '/tools', label: 'Tools', position: 'left'},
         {to: '/projects', label: 'Projects', position: 'left'},
+        {to: '/harness-engineering', label: 'Harness Engineering', position: 'left'},
         {to: '/about-us', label: 'About Us', position: 'left'},
         {
           href: 'https://github.com/vertexcover-io',
