@@ -11,7 +11,7 @@ import TLDR from '@site/src/components/TLDR';
 
 <TLDR>
 
-When an agent writes the code, "all tests green" stops meaning "the feature works". The agent will happily write tests that pass against a feature that's broken. So we added a second gate that runs after the unit suite: it boots the app, hits the live API, queries the live database, and drives the UI in a real browser, then writes a proof report the reviewer can replay. A month in, the artifact we open before approving a PR is the proof report, not the test suite.
+When an agent writes the code, a passing test suite no longer tells you the feature works. The agent will happily write tests that pass against a feature that's broken. So we added a second gate that runs after the unit suite: it boots the app, hits the live API, queries the live database, and drives the UI in a real browser, then writes a proof report the reviewer can replay. A month in, the artifact we open before approving a PR is the proof report, not the test suite.
 
 </TLDR>
 
