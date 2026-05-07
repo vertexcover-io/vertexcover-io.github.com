@@ -11,7 +11,7 @@ import TLDR from '@site/src/components/TLDR';
 
 <TLDR>
 
-Tests pass. The feature is still broken. We added a gate that boots the application, hits the live API with curl, queries the live database, drives the UI through Playwright MCP (Model Context Protocol), and writes a proof report the reviewer can replay.
+When an agent writes the code, "all tests green" stops meaning "the feature works". The agent will happily write tests that pass against a feature that's broken. So we added a second gate that runs after the unit suite: it boots the app, hits the live API, queries the live database, and drives the UI in a real browser, then writes a proof report the reviewer can replay. A month in, the artifact we open before approving a PR is the proof report, not the test suite.
 
 </TLDR>
 
@@ -29,11 +29,11 @@ Most "quality gates" answer one question: did the build go green? If type checke
 
 The problem is, the agent ships a bug every week that fits cleanly through that question. The code compiles. The tests it wrote pass. The endpoint still returns the wrong shape, the row never makes it into the database, or the page renders broken, because nothing in the pipeline ever booted the application and exercised it.
 
-So we added a second gate that does. It is called `functional-verify`. It runs after the metric gate, as a separate sub-agent, and its job is to run the live app: API endpoints via `curl`, database state via real queries, UI via Playwright MCP. We have been using it on every PR for about a month, and at this point we lean on it more than we lean on the unit suite.
+So we added a second check that does. It is called `functional-verify`. It runs after the metric check, as a separate sub-agent, and its job is to run the live app: API endpoints via `curl`, database state via real queries, UI via Playwright MCP. We have been using it on every PR for about a month, and at this point we lean on it more than we lean on the unit suite.
 
 {/* truncate */}
 
-## What the metric gate already covers
+## What the metric check already covers
 
 Before `functional-verify` runs, `quality-gate` has already enforced nine checks against a baseline captured at branch start. Three of them catch failure modes a normal CI pipeline does not:
 
@@ -43,38 +43,20 @@ Before `functional-verify` runs, `quality-gate` has already enforced nine checks
   <li><strong>Ignore comment audit.</strong> <code>git diff</code> is grep'd for <code>@ts-ignore</code>, <code># noqa</code>, <code>eslint-disable</code>, and friends. Any new ignore without an inline justification is a hard fail.</li>
 </ol>
 
-The metric gate is good at this. It is bad at "the endpoint returns 200 but the row was never inserted", "the listing markdown contains relative URLs the LLM will never match", and "the page renders, but the headline anchor is 24 pixels tall and a thumb can't tap it." Those are what `functional-verify` is for.
+The metric check is good at this. It is bad at "the endpoint returns 200 but the row was never inserted", "the listing markdown contains relative URLs the LLM will never match", and "the page renders, but the headline anchor is 24 pixels tall and a thumb can't tap it." Those are what `functional-verify` is for.
 
 ## What functional-verify actually does
 
 The skill reads a `## Verification Scenarios` section from the spec, or derives one scenario per acceptance criterion if the section is absent. Then it runs.
 
-```
-1. Probe common ports (3000, 5173, 8080, ...).
-   If nothing answers, start the app from package.json scripts
-   or compose.yml. Poll for health up to 30s.
-
-2. For each API scenario:
-     curl the endpoint with the spec's payload.
-     Capture exact command, status, response (<= 50 lines).
-
-3. For each DB scenario:
-     run the validation query against the live database.
-     Compare actual to expected.
-
-4. For each UI scenario, drive a real Chrome via Playwright MCP (Model Context Protocol):
-     browser_navigate, browser_click, browser_type,
-     browser_fill_form, browser_wait_for.
-     Screenshot at viewports 375 / 768 / 1280 per route.
-     Capture viewport-scale slices when scrollHeight > 2 * vh.
-     browser_console_messages after every navigation.
-
-5. Write proof-report.md with verdict per scenario,
-   plus a spec-coverage table mapping each REQ-N / EDGE-N
-   to the evidence file that proves it.
-
-6. Kill any process started in step 1.
-```
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li><strong>Start the app.</strong> If it's already running locally, attach to it. Otherwise, boot it from the project's standard start scripts and wait until it responds.</li>
+  <li><strong>Exercise the API.</strong> For each scenario in the spec, send the request the spec describes and record exactly what came back: the command sent, the status code, and the response body.</li>
+  <li><strong>Exercise the database.</strong> For each scenario, run the validation query against the live database and compare what's actually in there against what the spec says should be.</li>
+  <li><strong>Exercise the UI.</strong> For each scenario, drive a real browser through the page: navigate, click, type, fill forms, wait for things to appear. Take screenshots at phone, tablet, and desktop widths. For long pages, take a series of overlapping screenshots so nothing is missed below the fold. Capture browser console errors after every page load.</li>
+  <li><strong>Write the proof report.</strong> A verdict for each scenario, plus a coverage table that maps every requirement and edge case in the spec to the evidence file that proves it.</li>
+  <li><strong>Clean up.</strong> If the run started the app in step 1, shut it down.</li>
+</ol>
 
 The interesting parts are how it grades what comes back from each of those layers, and what counts as evidence.
 
@@ -84,9 +66,9 @@ Hand a vision model a screenshot and ask if the page looks fine, and it will tel
 
 ### A backend regression caught mid-run
 
-The newsletter pipeline fetches articles, converts each page to markdown, and hands the markdown to an LLM that picks out the post URLs worth indexing. The agent had just swapped the old fetcher for one built on [Crawlee](https://crawlee.dev), a web-scraping library. Unit tests passed.
+A change landed that passed every unit test and would have silently shipped an empty newsletter the next morning.
 
-`functional-verify` booted the stack and triggered a real run via `POST /api/runs/now`. The new converter was emitting **relative** paths (`/news/claude-opus-4-7`). The LLM downstream returns **absolute** URLs. The matcher between them does a literal substring check, so every chosen post would have been silently rejected and tomorrow's newsletter would have arrived empty.
+The agent had just swapped out the component that fetches a page and converts it to markdown. Downstream, an LLM reads that markdown, picks the URLs worth indexing, and returns them as a list. A matcher then checks each returned URL against the markdown with a literal substring search. After the swap, the converter started emitting **relative** paths (`/news/claude-opus-4-7`) while the LLM kept returning **absolute** URLs (`https://anthropic.com/news/claude-opus-4-7`). The substring check never matched. Every chosen post would have been silently dropped.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0' }}>
   <img
@@ -98,15 +80,17 @@ The newsletter pipeline fetches articles, converts each page to markdown, and ha
   </p>
 </div>
 
-The fix was a one-liner in `convert.ts` that resolves `<a href>` attributes against the page's baseUrl before the markdown converter sees the HTML. The test fixtures all happened to use absolute URLs already, so the substring check always matched in unit tests. The verifier was the first piece of the pipeline to ever hand the converter a real production page.
+The reason the unit tests missed it is the part worth remembering: every test fixture in the suite happened to use absolute URLs, so the substring check always matched in tests. The verifier was the first thing in the pipeline to ever hand the converter a real production page. The bug had been reachable for as long as the suite existed; nothing had ever reached it.
 
-A sibling entry in the same report, `VS-8`, is also worth noting. The LLM call further down the pipeline failed because the project's API key was out of credit. The verifier didn't paper over it: it logged the error, marked the scenario `EXTERNAL BLOCKER`, and noted the failure was not a regression because the same code path would fail identically under the previous implementation. That honesty about what was and wasn't verified is the part we care about most.
+The fix was a one-liner that resolves `<a href>` against the page's base URL before the converter sees the HTML.
+
+One thing worth calling out about how the verifier reported its run. A separate scenario in the same report failed for an unrelated reason: an external API key was out of credit. The verifier didn't paper over it or claim a pass. It logged the error, marked the scenario as an external blocker, and noted that the same code path would have failed identically before the change, so it wasn't a regression. That honesty about *what was and wasn't verified* is the part we care about most.
 
 ### A UI regression the test suite was never going to catch
 
 Different feature, same skill. The agent had just made the public archive page mobile-friendly. Tests passed. Opened it on a laptop, looked great.
 
-The gate opened the same page on a phone-sized window and tried to tap a story. It couldn't. The headlines were rendered as thin strips of text, much shorter than a thumb is wide, so any attempted tap landed somewhere in a cluster of three headlines and never reliably on the one you wanted. The agent had built a list you could not actually use on a phone.
+The verifier opened the same page on a phone-sized window and tried to tap a story. It couldn't. The headlines were rendered as thin strips of text, much shorter than a thumb is wide, so any attempted tap landed somewhere in a cluster of three headlines and never reliably on the one you wanted. The agent had built a list you could not actually use on a phone.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0' }}>
   <img
@@ -120,7 +104,7 @@ The gate opened the same page on a phone-sized window and tried to tap a story. 
 
 The verifier put the actual numbers in the report: each headline was 24 pixels tall. A comfortable tap target on a phone is at least 44. That's the whole bug, in one sentence the reviewer can re-check.
 
-The reason the test suite missed it is the reason it always misses bugs of this shape. Unit tests render components in isolation, on a desktop, with a mouse. They don't know what a phone screen feels like. A real browser, opened to phone size, does, and the gate runs that browser on every PR.
+The reason the test suite missed it is the reason it always misses bugs of this shape. Unit tests render components in isolation, on a desktop, with a mouse. They don't know what a phone screen feels like. A real browser, opened to phone size, does, and the check runs that browser on every PR.
 
 ## Why the verifier can't know the implementer
 
@@ -128,7 +112,7 @@ The reason the test suite missed it is the reason it always misses bugs of this 
 
 That separation is the whole point. In a healthy engineering team, the person who tests a feature is structurally allowed to say no to the person who built it. Without a second human in the loop, the pipeline has to simulate that separation itself. If the same agent that writes the feature also writes the "verified, all green" report, the report will say green every single time.
 
-So if you manage engineers who use coding agents, the first question worth asking is who in the loop is structurally allowed to say no. If the answer is the agent that wrote the code, the gate isn't really a gate.
+So if you manage engineers who use coding agents, the first question worth asking is who in the loop is structurally allowed to say no. If the answer is the agent that wrote the code, the check isn't really a check.
 
 ## How the proof report ends up on the PR
 
@@ -145,16 +129,18 @@ docs/spec/<feature>/verification/ui/observations.md
 
 The orchestrator's commit stage picks all of it up and includes it in the PR. The reviewer opens the PR, opens `proof-report.md`, and walks through:
 
-- A summary table: scenario id, type (api / db / ui / static), description, verdict.
-- API evidence: curl commands and response bodies.
-- DB evidence: queries and the rows they returned.
-- UI evidence: one row per (route, viewport) pointing at the saved PNG.
-- Spec coverage: every REQ-N and EDGE-N from the spec, mapped to the evidence file that proves it. A row without evidence is a gap, listed as NOT VERIFIED with a reason.
-- A "Not executed" section listing things the skill could not check (touch-hold gestures, real-device sensors, no-new-deps assertions, external services that were unreachable). Listed honestly, not papered over.
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li>A summary table: scenario id, type (api / db / ui / static), description, verdict.</li>
+  <li>API evidence: curl commands and response bodies.</li>
+  <li>DB evidence: queries and the rows they returned.</li>
+  <li>UI evidence: one row per (route, viewport) pointing at the saved PNG.</li>
+  <li>Spec coverage: every requirement and edge case from the spec, mapped to the evidence file that proves it. A row without evidence is a gap, listed as NOT VERIFIED with a reason.</li>
+  <li>A "Not executed" section listing things the skill could not check (touch-hold gestures, real-device sensors, no-new-deps assertions, external services that were unreachable). Listed honestly, not papered over.</li>
+</ol>
 
 If the reviewer disagrees with a verdict, they have the rect, the curl, the SQL row, the file path, or the screenshot to argue against.
 
-Today the proof report lands on the PR for human review. The reviewer reads the verdicts, opens the screenshots, and decides whether to approve. The gate produces evidence; the human still decides. That distinction matters: the report is not an automatic merge blocker, but it is the artifact we open first before clicking approve.
+Today the proof report lands on the PR for human review. The reviewer reads the verdicts, opens the screenshots, and decides whether to approve. The check produces evidence; the human still decides. That distinction matters: the report is not an automatic merge blocker, but it is the artifact we open first before clicking approve.
 
 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '20px 0' }}>
   <img
