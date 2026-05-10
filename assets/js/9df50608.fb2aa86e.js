@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[8497],{4329:e=>{e.exports=JSON.parse('{"title":"All posts","items":[{"title":"If the QA Gate Works, the Code Is Just an Artifact","permalink":"/harness-engineering/qa-gate-load-bearing-piece","unlisted":false,"date":"2026-05-06T00:00:00.000Z"}]}')}}]);

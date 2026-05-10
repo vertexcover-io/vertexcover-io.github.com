@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkblog_vertexcover=self.webpackChunkblog_vertexcover||[]).push([[8661],{7657:e=>{e.exports=JSON.parse('{"metadata":{"permalink":"/harness-engineering","page":1,"postsPerPage":10,"totalPages":1,"totalCount":1,"blogDescription":"Findings, experiments, and field notes on harness engineering","blogTitle":"Harness Engineering"}}')}}]);
