@@ -13,13 +13,13 @@ import WideImage from '@site/src/components/WideImage';
 
 A 13 GB GPT-OSS-20B inference container: **571s → 40.65s**. A 2.4 GB Llama-3.2 container: **91s → 7.4s**. Same hardware, same app, only the image format and snapshotter config changed.
 
-The first thing we tried — lazy loading — made it 66% slower. The biggest single win came from *removing* compression. The last bottleneck wasn't in containerd at all; it was the AWS EBS write ceiling.
+The obvious first move — lazy loading — made things 66% slower. The biggest single win came from a stack of hidden config knobs we had to read the snapshotter's Go source to find. The last bottleneck wasn't in containerd at all; it was the AWS EBS default write ceiling.
 
 If you ship LLM images and your cold start is over a minute, this is for you.
 
 </TLDR>
 
-<WideImage src={require('./hero.png').default} alt="Cold start journey across six fixes — Llama 3.2 1B (91s → 7.4s) and GPT-OSS 20B (571s → 40.65s)" />
+<WideImage src={require('./hero.png').default} alt="Cold start journey across five fixes — Llama 3.2 1B (91s → 7.4s) and GPT-OSS 20B (571s → 40.65s)" />
 
 If you ship a multi-gigabyte ML container — Hugging Face weights baked in, PyTorch + transformers, a FastAPI server — and you've watched the deploy take five-plus minutes from `docker run` to first inference, this post is the playbook we wish we had.
 
