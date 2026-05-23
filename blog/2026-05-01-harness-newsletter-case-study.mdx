@@ -1,0 +1,166 @@
+---
+slug: "harness-engineering-newsletter-case-study"
+title: "Harness Engineering in Practice: Shipping a Production Newsletter in 30 Days"
+date: 2026-05-01T00:00:00+00:00
+authors: [aksdev]
+tags: [ai, claude-code, engineering, harness, agents]
+draft: false
+---
+
+import TLDR from '@site/src/components/TLDR';
+
+<TLDR>
+
+In April 2026, one engineer and Claude shipped a production AI-news aggregator in **30 days, 88 merged PRs**. Every change passed through the same governance loop (design, plan, tests, review, hard verification gate) before it could merge. This post is about the loop that made that possible.
+
+</TLDR>
+
+There are two stories about AI coding right now, and they're both wrong.
+
+The first is the demo-day story: an agent ships a SaaS in an afternoon, the founder posts the screen recording, the replies are a mix of awe and "this will never survive a real codebase." The second is the skeptic's story: agents hallucinate APIs, can't hold a design in their head, and produce code that looks fine until it touches production. Both stories are about the *agent*. Neither is about the system around the agent.
+
+Our bet at [Vertexcover](https://vertexcover.io) is that the system around the agent is where almost all the leverage is. The term for this is **harness engineering**: the discipline of building the rails (design docs, plans, tests, quality gates, review loops) that turn a fast-but-reckless coding agent into something you'd actually let near production. The agent is the engine. The harness is the chassis, the seatbelts, and the test track.
+
+Put another way: the harness is the governance layer. It is our answer to the question every engineering manager asks the first time someone proposes shipping agent-written code: *what stops this from merging a hallucination?*
+
+The harness itself is also new. We started building [harness](https://github.com/vertexcover-io/harness-engineering), our open-source Claude Code plugin, in April, alongside the newsletter. The two projects evolved together: a real product gave the harness its hardest test, and the harness gave the product its rails. End to end. One engineer driving. No "Claude wrote this part, I rewrote it by hand" cheating.
+
+The product is an AI-news aggregator that we now read every morning. Here is what the harness did, where it failed, and what the numbers say.
+
+{/* truncate */}
+
+## The product
+
+A daily AI newsletter, fully automated. Four collectors (HN, Reddit, generic web, Twitter/X), two-stage ranking with Claude Sonnet, a private review UI, a public archive, an EC2 deploy.
+
+<div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', margin: '16px 0' }}>
+  <img
+    src="/img/newsletter-public-archive-desktop.png"
+    alt="The public archive listing at news.vertexcover.io"
+    style={{ flex: '1 1 0', minWidth: '280px', maxWidth: '50%', height: 'auto', borderRadius: '4px', border: '1px solid #e5e7eb' }}
+  />
+  <img
+    src="/img/newsletter-single-issue-desktop.png"
+    alt="A single issue page rendered in the Ledger aesthetic"
+    style={{ flex: '1 1 0', minWidth: '280px', maxWidth: '50%', height: 'auto', borderRadius: '4px', border: '1px solid #e5e7eb' }}
+  />
+</div>
+
+We read it every morning. That's the whole product.
+
+> Stack, for the curious: TypeScript monorepo (`shared` / `api` / `pipeline` / `web`), Drizzle + PostgreSQL, BullMQ + Redis, Hono, React + Vite, Vitest. Nothing exotic.
+
+The interesting question isn't *what* we built. It's *how*. What did each stage of the harness contribute, compared to the boring counterfactual of "just open Cursor and start typing?"
+
+## The harness, in one diagram
+
+![The harness pipeline: Brainstorm to Plan to TDD to Code Review to Quality Gate to PR, with a BLOCKED loop from Quality Gate back to TDD](/img/harness-pipeline-diagram.png)
+
+Two things to notice. **The first two stages are human-gated.** A person signs off on the design and the implementation plan before a single line of code is written. **The last three stages are autonomous, but adversarial.** The coder, the reviewer, and the verifier are separate agents with separate mandates, and the verifier can send work back. That loop-back arrow is the most important line on the diagram: a failing gate doesn't ask a human for help, it sends the dev agent back to fix its own work.
+
+In practice the loop is a Claude Code plugin: `/orchestrate "<prompt>"` runs the whole thing, or you can invoke individual skills (`/brainstorm`, `/tdd`, `/code-review`, `/git-commit`) for a smaller cut. The shape matters more than the commands, though. Humans approve intent, agents do the work, rework is enforced rather than requested.
+
+## A dashboard, because the terminal stopped scaling
+
+Once we were running two or three orchestrations in parallel, the terminal became the bottleneck. Tabbing between Claude Code sessions to check "which stage is this one on?" or "did the gate pass?" was lossy and slow, and reading a spec or a plan inline in the terminal was worse. So we built a dashboard.
+
+It is not fancy. Every run writes a `dag.json` plus a folder of reports, and the dashboard renders that folder. One page per run. Every node is clickable and opens the underlying report (the spec, the phase plan, the code-review verdict, the gate's verbatim output). At a glance you see *where* a run is; one click in you see *what it produced*.
+
+<div style={{ display: 'flex', justifyContent: 'center', margin: '16px 0' }}>
+  <img
+    src="/img/harness-dag-dashboard.png"
+    alt="A real harness run for the public-archive-listing feature, rendered in the dashboard: every stage shown as a green DAG node, with Setup expanded into Worktree and Baseline, Coder expanded into eight phases with their dependency fan-out, Code Review expanded into one review pass, and the parallel Sync Docs / Capture Learnings tail before the final Commit & PR step"
+    style={{ maxWidth: '420px', width: '100%', height: 'auto', borderRadius: '4px', border: '1px solid #e5e7eb' }}
+  />
+</div>
+
+The Coder block is where the view earns its keep. A non-trivial feature is split into phases (here, eight: shared types, two parallel API tracks, the admin gate, the web client, route splitting, two parallel UI builds). Phase 1 fans out to 2 and 3 because they're independent; Phase 6 fans out to 7 and 8 for the same reason. That decomposition came from the planning stage, not the coder, and seeing it laid out is the difference between "the agent wrote a feature" and "the agent worked through a dependency graph the way a careful engineer would."
+
+## The verifier that doesn't trust the agent
+
+If we had to keep one skill from the harness and throw the rest away, we'd keep the **quality gate**.
+
+Here's the problem. The agent writes the code. The agent also writes the tests. Asking that same agent "do the tests pass?" is asking it to grade its own homework. In a real engineering team this is exactly why **QA and dev cannot be friends**: the QA's job is to be unimpressed by the dev's confidence. The harness has to simulate that adversarial relationship, because there is no second human in the loop.
+
+So we made Claude play QA. A separate session, a different mandate, no view of the code that produced the feature, only the running application. Its job is to break the thing the dev just shipped.
+
+That's what `functional-verify` does. It boots the app, then drives it like a user:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li><strong>API</strong>: <code>curl</code> against every endpoint with the spec's payloads. Body and status code captured to disk.</li>
+  <li><strong>DB</strong>: query the actual database after each mutation. Compare rows to expected.</li>
+  <li><strong>UI</strong>: drive a real Chrome via Playwright MCP. Click, type, fill forms, wait for state. One screenshot per route per viewport (375 / 768 / 1280), plus tall-page slices.</li>
+  <li><strong>Console + network</strong>: errors after every navigation, distinguishing new from pre-existing.</li>
+</ol>
+
+Every claim it makes has to cite evidence a reviewer can re-run. A `getBoundingClientRect()` rect. A quoted string from the DOM. A computed-style value. An HTTP response. "Looks fine" and "feels polished" are explicitly banned by the skill.
+
+The output is a `proof-report.md` attached to the PR. It looks something like this:
+
+| ID   | Type | Description                              | Verdict |
+|------|------|------------------------------------------|---------|
+| VS-1 | api  | POST /api/runs/now triggers a daily run  | PASS    |
+| VS-2 | db   | run row written with status='running'    | PASS    |
+| VS-3 | ui   | /admin/review/:id renders ranked items   | UNMET   |
+| VS-4 | ui   | drag-to-reorder persists on save         | PASS    |
+
+With the failing entry expanded inline:
+
+```text
+VS-3 (UNMET)
+Route:    /admin/review/abc123 @ 375px
+Finding:  card title clipped on second row
+Evidence: getBoundingClientRect() of .card-title:nth-child(2)
+          { width: 343, scrollWidth: 412 } → overflow
+Screenshot: verification/ui/review-375-slice-02.png
+```
+
+And then it does the part that surprised us most: it grades its own screenshots **twice**.
+
+If the first pass found nothing wrong, the verdict is hidden and the QA agent is re-prompted:
+
+> "The previous reviewer claims this page is fine. Look again. There is likely at least one defect."
+
+In our April mobile sweep, the adversarial second pass caught more real UX bugs than the unit tests did.
+
+If anything fails, the verdict is BLOCKED and the pipeline loops back to TDD. The dev agent gets the failing scenario, fixes the code, re-runs. No human in between.
+
+![A real proof-report.md from the mobile-friendly frontend run, mixing PASS and PARTIAL FAIL verdicts with concrete rect-and-file evidence](/img/proof-report-mobile-friendly.png)
+
+This is now the artifact we trust most. The test suite tells you the code compiles. The proof report tells you the application *works*.
+
+> The quality gate is not where you check the agent's work. It's where the QA agent checks the dev agent's work, and refuses to be friends.
+
+If you're managing engineers who use coding agents: collapsing "the agent that writes the code" and "the agent that verifies it" into one session is the org-design equivalent of letting developers sign off on their own QA. Keep them apart, even when they're both Claude.
+
+## The side effect that surprised us
+
+Six months from now, when someone asks "why did we build the Web collector this way?", the answer is one folder away: the design, the plan, the verification evidence, the reviewer's verdict, all written into the repo as the run executed. No tribal knowledge. No "ask the engineer who wrote it." In April this produced 38 verification scenarios with their captured payloads, 15 UI screenshots, and 31 design docs, all committed alongside the code they describe.
+
+## Lessons
+
+**1. The verifier is the product.** Build the gate first. Without a hard verifier, a pipeline just ships hallucinations faster.
+
+**2. Don't let the agent grade its own homework.** The agent writes the code, the tests, *and* the report that says "all green." Add independent checks it can't influence: test count vs. baseline, skip/ignore audits, scope enforcement, stagnation tripwires. Same controls you'd put on an eager junior.
+
+**3. The harness has no taste.** It will happily ship a feature that works and is wrong, including architecturally wrong choices the gate can't catch (a memory leak in our Crawlee migration, caught only because a human pushed back on the lifecycle assumption during design review). Keep a human at the brainstorm. Product and architecture decisions don't belong to the gate.
+
+**4. Treat every gate failure like a postmortem.** Capture each failure as a rule the next run reads. The harness gets cheaper only if you compound the lessons.
+
+**5. The harness can't test what it can't see.** Mobile UX, ranking drift, silent sources: none of these show up in unit tests. Good at *did the code work?* Bad at *is the product still good?* That's the May roadmap.
+
+## Where we go from May
+
+The April loop works. The May problem is not *building* features. It's *trusting* the system to run unattended. We know our blind spots; the next month is about closing them so a human doesn't have to be in the loop to catch what the gate missed.
+
+Three workstreams:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li><strong>End-to-end testing as a first-class harness stage.</strong> The agent validates its own UX changes against a Playwright recording before claiming "done." Closes the mobile-regression gap.</li>
+  <li><strong>Source-health observability.</strong> If HN goes silent for two days, the harness opens its own ticket. The system notices its own breakage instead of waiting for a human to.</li>
+  <li><strong>Ranking quality benchmarks.</strong> A held-out set we re-run after every model or prompt change. Catches quality drift before it ships.</li>
+</ol>
+
+---
+
+If any of this resonates, the repo is open: [github.com/vertexcover-io/harness-engineering](https://github.com/vertexcover-io/harness-engineering). We'd rather hear what's wrong with this approach than be told it's neat.
