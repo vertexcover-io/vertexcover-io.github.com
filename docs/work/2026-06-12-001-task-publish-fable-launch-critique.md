@@ -18,6 +18,15 @@ Turn the uploaded draft (`claudefable5truthvsfable.md`) into a publishable blog 
 6. Cut the skeptic quote in "The fable" section ("docs are still playing catch-up…") — it read as a non-sequitur and didn't support the demo-vs-evidence point.
 7. Internal link to the context-engineering post made relative (`/claude-code-context-engineering-v2`) so the build's broken-link checker validates it.
 
+## Revision 2 (same day)
+
+Reframed the post from the studio's own verdict to a curated "what people are saying" roundup, per author request:
+
+- TL;DR, intro, and closing now attribute judgments to builders/labs/reviewers instead of "we".
+- "How we'd actually use it" → "Where the launch-week consensus lands".
+- Section framings ("clear our bar", "the tell we use", "we'd treat as reliable") rewritten as community-attributed.
+- A Part 2 teaser (harness experiment: Fable 5 / Opus 4.8 with & without harness, plus DeepSeek) was drafted, then removed at author request. Idea is parked for a possible follow-up post; not referenced anywhere in the published piece.
+
 ## Open items before merge (need author/network access)
 
 - Verify every external link — outbound fetches are blocked in this environment (403s), so none of the receipts could be checked.
