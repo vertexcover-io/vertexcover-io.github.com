@@ -45,6 +45,7 @@ const config: Config = {
         blogSidebarTitle: 'All posts',
         blogSidebarCount: 'ALL',
         showReadingTime: true,
+        sortPosts: 'descending',
         feedOptions: {
           type: ['rss', 'atom'],
           xslt: true,

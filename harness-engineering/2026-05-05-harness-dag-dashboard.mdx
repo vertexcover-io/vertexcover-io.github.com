@@ -1,0 +1,314 @@
+---
+slug: "harness-engineering-dag-dashboard"
+title: "Why We Built a DAG Dashboard for Agentic Engineering"
+date: 2026-05-15T00:00:00+00:00
+authors: [aksdev]
+tags: [ai, claude-code, engineering, harness, agents]
+---
+
+import TLDR from '@site/src/components/TLDR';
+
+<TLDR>
+
+Agentic engineering breaks down when every parallel task is hidden inside terminal logs. We built a live DAG dashboard for Harness so teams can see what each agent is doing, what is blocked, where a human is needed, and which spec, plan, review, and verification report backs the work. This post is about turning agent runs from a scrolling log into an operating surface managers can trust and developers can actually use.
+
+</TLDR>
+
+The first version of our agentic workflow was easy to understand because it looked like a terminal conversation. Ask Claude Code to build something, watch it brainstorm, approve a plan, then wait while it implements and verifies the change.
+
+That works while one person is supervising one task.
+
+It stops working when the team starts running multiple tasks in parallel.
+
+At that point the important question is no longer "what did the agent just print?" It is:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li>Which task is still designing, and which one is already coding?</li>
+  <li>Which phase is blocked on a previous phase?</li>
+  <li>Is the agent waiting for a human decision?</li>
+  <li>Did the quality gate pass, or did it silently get skipped?</li>
+  <li>Which spec, plan, review, and verification report produced this PR?</li>
+  <li>How many agents are active, and what are they responsible for?</li>
+</ol>
+
+You can answer all of those questions from logs if you are patient enough. But that patience is exactly the problem. Logs are a record. They are not an operating surface.
+
+So we built a dashboard.
+
+{/* truncate */}
+
+The dashboard is not meant to make agentic development look more impressive. It is meant to make it governable. Developers get a faster way to inspect the live execution path. Managers get a clearer way to see whether the team is following the agreed process: design before code, plan before implementation, tests before merge, verification before PR.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '24px 0' }}>
+  <img
+    src="/img/harness-dag-dashboard-overview.png"
+    alt="Harness DAG dashboard showing the Add Twitter/X collector run with completed setup stages, an expanded Coder group, two running phase nodes, pending downstream nodes, and the status legend."
+    style={{ width: '100%', height: 'auto', borderRadius: '6px', border: '1px solid #2D2D2D' }}
+  />
+  <p style={{ marginTop: '8px', fontStyle: 'italic', color: 'var(--ifm-color-emphasis-600)', fontSize: '0.9em' }}>
+    A live run is easier to understand as state: done, running, pending, and dependent work are visible at once.
+  </p>
+</div>
+
+## The Management Problem
+
+Managers do not need more terminal logs. They need confidence that the workflow is moving, blocked in the right places, and following the team's rules.
+
+Traditional engineering already has visible checkpoints: tickets, design docs, PRs, CI, review comments, and standups. Agentic engineering compresses many of those steps into one long-running session: brainstorm, spec, plan, parallel agents, tests, review fixes, docs, and PR creation. If that state only lives in the terminal, the team has to trust the agent's final summary instead of inspecting the process.
+
+We wanted the agentic workflow to expose the same things a good engineering team already cares about:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li><strong>Current state:</strong> what is running, done, failed, waiting, skipped, or interrupted.</li>
+  <li><strong>Dependency structure:</strong> which tasks depend on which other tasks.</li>
+  <li><strong>Human intervention:</strong> where the process needs a decision from a person.</li>
+  <li><strong>Rule adherence:</strong> whether required stages like planning, testing, review, quality gates, and documentation actually ran.</li>
+  <li><strong>Evidence:</strong> links to the exact design, spec, plan, review, verification, and quality reports.</li>
+</ol>
+
+The DAG dashboard is the surface for that.
+
+## The Developer Problem
+
+For developers, the problem is attention.
+
+Harness Engineering's `/orchestrate` pipeline can run a full feature workflow:
+
+```text
+Setup
+  → Brainstorm
+  → Library Probe
+  → Spec Generation
+  → Planning
+  → Coder
+  → Code Review
+  → Verify & Finalize
+  → Commit & PR
+```
+
+Some stages need conversation context or human approval. Others run through sub-agents. `Coder` can split work into dependency-based phases and dispatch independent phases in parallel; verification then runs functional checks, quality gates, docs sync, and learnings before commit and PR.
+
+That is too much state for a terminal tab. Logs are useful when you know what to search for; they are poor at answering "where should I look?" The dashboard gives developers the map: failed phase, reviewed plan, waiting node, and sub-agent report are all visible from the graph. The terminal stays the execution stream; the dashboard becomes the state of the work.
+
+## Why a DAG
+
+We did not choose a DAG because it sounds sophisticated. We chose it because the work is actually a DAG.
+
+A multi-agent implementation is not a linear checklist. Some tasks must happen in order: you cannot implement against a plan that does not exist yet, and you should not verify code that has not been written. But inside implementation, independent phases can run at the same time. The planner may decide that shared types must happen first, then API work and UI work can proceed in parallel, then integration depends on both.
+
+A list hides that structure. A DAG shows it.
+
+That distinction matters for both audiences:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li>For a developer, the DAG explains why a phase has not started yet.</li>
+  <li>For a manager, the DAG shows whether "parallel agent work" is disciplined parallelism or just several agents editing randomly.</li>
+</ol>
+
+In our pipeline, the top-level DAG starts before any codebase exploration. The orchestrator initializes the dashboard, creates the stage nodes, and starts a tiny local server. Once planning finishes, the planner's phase graph is mirrored into the dashboard as children under `Coder`.
+
+```text
+Coder
+├── Phase 1: shared foundation
+├── Phase 2: API track       depends on Phase 1
+├── Phase 3: UI track        depends on Phase 1
+└── Phase 4: integration     depends on Phase 2 + Phase 3
+```
+
+The dependency graph is not decoration. It is how the orchestrator decides what can run in parallel.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '24px 0' }}>
+  <img
+    src="/img/harness-dag-dashboard-phase-fanout.png"
+    alt="Expanded Coder node in the Harness DAG dashboard showing six implementation phases and dependency arrows between them."
+    style={{ width: '100%', height: 'auto', borderRadius: '6px', border: '1px solid #2D2D2D' }}
+  />
+  <p style={{ marginTop: '8px', fontStyle: 'italic', color: 'var(--ifm-color-emphasis-600)', fontSize: '0.9em' }}>
+    The planner's phase graph rendered back into the dashboard: shared schema work unlocks parallel API, adapter, worker, and UI tracks.
+  </p>
+</div>
+
+## What the Dashboard Shows
+
+Each run gets a folder under `.harness/<spec-name>/`:
+
+```text
+.harness/<spec-name>/
+├── dag.json
+├── index.html
+├── reports/
+│   ├── worktree-report.md
+│   ├── baseline-report.md
+│   ├── brainstorm-report.md
+│   ├── planning-report.md
+│   ├── phase-1-report.md
+│   ├── code-review-report.md
+│   ├── verify-finalize-report.md
+│   └── commit-pr-report.md
+├── server.log
+├── server.pid
+└── server.port
+```
+
+The `dag.json` file is the live state of the run. It has three parts:
+
+```json
+{
+  "meta": {
+    "specName": "public-archive-listing",
+    "task": "Add a public archive listing",
+    "branch": "feat/public-archive-listing",
+    "worktree": "../newsletter-public-archive-listing",
+    "startedAt": "2026-04-22T11:14:08Z",
+    "completedAt": null,
+    "outcome": "running"
+  },
+  "nodes": {
+    "setup": {
+      "label": "Setup",
+      "status": "done",
+      "startedAt": "2026-04-22T11:14:08Z",
+      "completedAt": "2026-04-22T11:15:02Z",
+      "artifacts": { "report": "reports/setup-report.md" },
+      "children": ["worktree", "baseline"]
+    },
+    "coder": {
+      "label": "Coder",
+      "status": "running",
+      "startedAt": "2026-04-22T11:28:10Z",
+      "completedAt": null,
+      "artifacts": {},
+      "children": ["phase-1", "phase-2", "phase-3"]
+    }
+  },
+  "edges": [
+    ["setup", "brainstorm"],
+    ["brainstorm", "library-probe"],
+    ["planning", "coder"],
+    ["phase-1", "phase-2"]
+  ]
+}
+```
+
+That schema is intentionally boring. Nodes have labels, statuses, timestamps, artifacts, and children. Edges describe dependencies. Reports live as markdown files and are linked from node artifacts.
+
+The browser page reads `dag.json`, lays out the graph with Dagre, renders it with D3, and refreshes every two seconds while the run is active. It uses color as a status language:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li><code>pending</code>: the work exists but cannot start yet.</li>
+  <li><code>running</code>: an agent is actively working.</li>
+  <li><code>waiting</code>: the process needs a human response.</li>
+  <li><code>done</code>: the stage completed successfully.</li>
+  <li><code>failed</code>: the stage failed.</li>
+  <li><code>skipped</code>: the orchestrator intentionally skipped the stage.</li>
+  <li><code>interrupted</code>: the run stopped before clean completion.</li>
+</ol>
+
+Click a completed node and the dashboard opens the report markdown in a modal, rendered with `marked` and sanitized with `DOMPurify`. Parent nodes can be expanded so you can see nested phases and sub-tasks without leaving the graph.
+
+For managers, this means the process is inspectable without asking an engineer to narrate the terminal. For developers, it means the artifacts are one click away from the execution state that produced them.
+
+## The Write API
+
+The dashboard is updated by one script: `skills/orchestrate/dashboard/dag-update.sh`.
+
+The orchestrator and sub-agents do not edit `dag.json` directly. They call a small command surface:
+
+```bash
+dag-update init <spec-name> "<task>" <branch> <worktree>
+dag-update add-node <id> "<label>" --parent <id> --depends-on <id,id>
+dag-update add-edge <from> <to>
+dag-update set-status <id> <pending|running|waiting|done|failed|skipped|interrupted>
+dag-update set-artifact <id> <key> <value>
+dag-update write-report <id> "<markdown>"
+dag-update serve
+dag-update finalize <done|failed|interrupted>
+```
+
+This is the part that makes the pattern reusable. You do not need a database, a backend application, or a SaaS observability product to start. You need a shared state file, a stable update contract, and a habit: every meaningful stage transition writes to the dashboard.
+
+That habit changes how agents behave. A sub-agent cannot just say "done" in its final message. It is expected to mark its node, write a report, and attach the relevant artifacts. The state surface nudges the workflow toward accountability.
+
+## Operational Details
+
+Three details make the dashboard useful during real multi-agent runs.
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li><strong>Parallel agents write through one contract.</strong> Sub-agents do not coordinate with each other directly. They call <code>dag-update.sh</code> to add nodes, change status, and attach reports. The script protects <code>dag.json</code> with a small portable lock so concurrent updates do not overwrite each other.</li>
+  <li><strong>Human intervention is visible.</strong> A human approval gate should not look like active work. Harness uses Claude Code hooks to flip the current node to <code>waiting</code> before an <code>AskUserQuestion</code> call and back to <code>running</code> after the user responds.</li>
+  <li><strong>Status is connected to evidence.</strong> A green node only says something completed. The useful part is the attached markdown report: what changed, which tests ran, what review found, and whether verification passed.</li>
+</ol>
+
+```text
+PreToolUse  on AskUserQuestion -> set current running node to waiting
+PostToolUse on AskUserQuestion -> set waiting node back to running
+```
+
+For a developer, purple means "come back and answer this." For a manager, purple means "the system is not stuck; it is deliberately waiting on a person."
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '24px 0' }}>
+  <img
+    src="/img/harness-dag-dashboard-waiting.png"
+    alt="Harness DAG dashboard with the Planning node highlighted in purple to show the run is waiting for human input."
+    style={{ width: '100%', height: 'auto', borderRadius: '6px', border: '1px solid #2D2D2D' }}
+  />
+  <p style={{ marginTop: '8px', fontStyle: 'italic', color: 'var(--ifm-color-emphasis-600)', fontSize: '0.9em' }}>
+    Purple is a human gate, not a failure. The run is paused until someone approves or answers.
+  </p>
+</div>
+
+The reports are what make the dashboard useful beyond live status. The orchestrate skill defines report formats for coder phases, code review, fixes, functional verification, quality gate, docs sync, learnings, and commit/PR.
+
+A phase report can include:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li>summary of the work completed,</li>
+  <li>files changed,</li>
+  <li>tests added or run,</li>
+  <li>key implementation decisions,</li>
+  <li>issues encountered.</li>
+</ol>
+
+A code review report can include:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li>verdict,</li>
+  <li>defect counts,</li>
+  <li>file and line references,</li>
+  <li>required fixes.</li>
+</ol>
+
+A verification report can include:
+
+<ol style={{ listStyleType: 'decimal', listStylePosition: 'outside', paddingLeft: '1.5rem', margin: '12px 0' }}>
+  <li>API evidence,</li>
+  <li>UI screenshots,</li>
+  <li>commands run,</li>
+  <li>infrastructure started and cleaned up,</li>
+  <li>pass/fail verdicts for scenarios.</li>
+</ol>
+
+This is where the dashboard becomes useful to managers, not just developers. It gives the team a way to ask, "Did we follow the rules?" without relying on a final natural-language summary from the agent.
+
+If a required report is missing, that is visible. If the quality gate failed, that is visible. If a stage was skipped, that is visible. The dashboard does not replace code review or CI, but it gives reviewers the process trail that led to the diff.
+
+<div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', margin: '24px 0' }}>
+  <img
+    src="/img/harness-dag-dashboard-report-modal.png"
+    alt="Code Review report opened from a DAG node, showing the review verdict, findings, test counts, and linked review reports."
+    style={{ width: '100%', height: 'auto', borderRadius: '6px', border: '1px solid #2D2D2D' }}
+  />
+  <p style={{ marginTop: '8px', fontStyle: 'italic', color: 'var(--ifm-color-emphasis-600)', fontSize: '0.9em' }}>
+    Clicking a node turns status into evidence: verdicts, fixes, test counts, and links to the reports behind the run.
+  </p>
+</div>
+
+## Conclusion
+
+The dashboard is small, but the practice behind it is larger. If a team is going to use agents for real engineering work, the workflow should be observable in the same way human workflows are observable. Not because managers need more dashboards, but because parallel automated work needs shared state.
+
+Those practices are not specific to Claude Code or Harness. Any agentic workflow that moves through design, planning, implementation, review, and verification can adopt them. The first win is simply getting the process out of the terminal and into a shared view.
+
+The Harness Engineering implementation is in [github.com/vertexcover-io/harness-engineering](https://github.com/vertexcover-io/harness-engineering). The orchestrate skill lives under `skills/orchestrate/`, and the dashboard code is under `skills/orchestrate/dashboard/`.
+
+Agentic engineering does not remove the need for process. It increases the need for process that is visible. The faster the agents move, the more important it becomes to know what they are doing, what they are waiting on, and what evidence they left behind.
