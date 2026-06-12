@@ -27,6 +27,17 @@ Reframed the post from the studio's own verdict to a curated "what people are sa
 - Section framings ("clear our bar", "the tell we use", "we'd treat as reliable") rewritten as community-attributed.
 - A Part 2 teaser (harness experiment: Fable 5 / Opus 4.8 with & without harness, plus DeepSeek) was drafted, then removed at author request. Idea is parked for a possible follow-up post; not referenced anywhere in the published piece.
 
+## Revision 3 (same day)
+
+Full restructure around a head-of-engineering adoption lens, per author request:
+
+- Reorganized from three buckets into four decision questions: is the jump real / what does it unlock / where will it burn you / do you switch.
+- TL;DR rewritten so it no longer repeats body bullets verbatim.
+- Cut duplication: "These aren't demos…" framing line, the genomics *Science* item (not adoption-relevant), two of four viral-demo examples, the repeated throughline/closing one-liner.
+- Added new sources found via web search: HN early-tester impressions (item 48464975), HN report of fabricated test claims (launch thread), HN "mid-tier results" thread (item 48492210), CodeRabbit code-review eval (precision regression vs Opus 4.8, "selective adoption" verdict), HN safety-filter reports (medical imaging / "nuclear" physicist / MRI flagged as bioterrorism).
+- Ends with five takeaway rules ("trust the diff, not the model's test report", etc.).
+- Note: page-level fetches still blocked in this sandbox; new claims come from search-result summaries and must be click-verified against the linked sources before merge (especially the HN quotes and CodeRabbit numbers).
+
 ## Open items before merge (need author/network access)
 
 - Verify every external link — outbound fetches are blocked in this environment (403s), so none of the receipts could be checked.
