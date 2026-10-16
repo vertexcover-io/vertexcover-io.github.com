@@ -49,3 +49,12 @@ aksdev:
     linkedin: aksdev
     github: amankumarsingh77
 
+savitha:
+  name: Savitha Suresh
+  title: Software Engineer
+  url: https://github.com/savitha-suresh
+  image_url: https://github.com/savitha-suresh.png
+  page: true
+  socials:
+    linkedin: savitha-suresh-85b434104
+    github: savitha-suresh
