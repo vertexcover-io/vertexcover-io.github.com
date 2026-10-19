@@ -12,7 +12,7 @@ We had been using fine-tuned OpenAI and Gemini models to classify entities in ou
 
 We could. One epoch of fine-tuning on about 3,600 examples improved accuracy for every customer we measured, by 7.6 F1 points on average, at about a third of the per-token cost of the API models. The run took 26 hours on four H100s.
 
-We never shipped it. That is the second half of this story. The first half is the four training setups we went through, three of which failed before a single training step ran, because the reason surprised us and it applies to anyone trying to fine-tune a model this size on one machine.
+We never shipped it. That is the second half of this story. The first half is the five training setups we went through, four of which failed before a single training step ran, because the reason surprised us and it applies to anyone trying to fine-tune a model this size on one machine.
 
 {/* truncate */}
 
@@ -51,15 +51,17 @@ The model is 470 GB in its normal 16-bit form. Compressed to 4-bit, which is the
 
 The trouble is that compressing and splitting are done by different libraries, and they want things in a different order. The compression library needs to see each weight matrix whole before it compresses it. The splitting library wants to cut everything into pieces as early as possible so that no single process ever has to hold the full model. In between, something has to hold a lot of the model at once. With a 7-billion-parameter model that something is 14 GB and nobody notices. With this model it is 470 GB, and whether a run starts at all depends on where that 470 GB lands.
 
-Each failure below is the same thing happening in a different place: one process ended up holding the whole model somewhere it did not fit.
-
-## Four setups
+## Five setups
 
 ### Axolotl: out of memory, both ways
 
 Axolotl has a setting that makes one process load the model into system RAM while the others wait for their share. With it on, loading worked (470 GB fits in 960 GB) but the run died while moving the model to the GPUs. With it off, each process loaded straight onto its own GPU, where 120 GB does not fit in 80 GB.
 
-In every one of Axolotl's loading paths, each process holds the whole model at some point, either in RAM or on its GPU. There is one path that loads, compresses and splits one piece at a time, but it does not recognise how this model stores its experts, so it skips them and crashes later. Someone else hit that exact failure with the same model ([axolotl #3445](https://github.com/axolotl-ai-cloud/axolotl/issues/3445)). The only reported way to run this model in Axolotl keeps the weights in system RAM and streams them to the GPUs as needed ([axolotl #3443](https://github.com/axolotl-ai-cloud/axolotl/issues/3443)), which is the same idea that eventually worked for us.
+In every one of Axolotl's loading paths, each process holds the whole model at some point, either in RAM or on its GPU. There is one path that loads, compresses and splits one piece at a time, but it does not recognise how this model stores its experts, so it skips them and crashes later ([axolotl #3445](https://github.com/axolotl-ai-cloud/axolotl/issues/3445)). The one path we got running keeps the weights in system RAM and streams them to the GPUs as needed ([axolotl #3443](https://github.com/axolotl-ai-cloud/axolotl/issues/3443)), which is the same idea that eventually worked for us.
+
+### Unsloth: a CPU tensor in a GPU kernel
+
+The model got through loading. Training then failed with a Triton kernel error: a CPU tensor ended up where a GPU tensor was expected. We filed it as [unsloth #4137](https://github.com/unslothai/unsloth/issues/4137), and it was an open bug at the time. It has since been fixed, by copying the labels onto the GPU before the kernel runs.
 
 ### Answer.AI's FSDP+QLoRA: could not start
 
