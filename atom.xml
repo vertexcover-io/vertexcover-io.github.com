@@ -2,11 +2,105 @@
 <feed xmlns="http://www.w3.org/2005/Atom">
     <id>https://blog.vertexcover.io</id>
     <title>Blog - Vertexcover Blog</title>
-    <updated>2026-10-16T00:00:00.000Z</updated>
+    <updated>2026-11-03T00:00:00.000Z</updated>
     <generator>https://github.com/jpmonette/feed</generator>
     <link rel="alternate" href="https://blog.vertexcover.io"/>
     <subtitle>Blog - Vertexcover Blog</subtitle>
     <icon>https://blog.vertexcover.io/img/favicon.ico</icon>
+    <entry>
+        <title type="html"><![CDATA[We tuned vLLM by hand for 64% more throughput. An agent should have done it.]]></title>
+        <id>https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch</id>
+        <link href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch"/>
+        <updated>2026-11-03T00:00:00.000Z</updated>
+        <summary type="html"><![CDATA[Shrinking from 397B to 27B, the vLLM changes that freed KV cache memory for 64% more throughput, and why the search belongs to an agent.]]></summary>
+        <content type="html"><![CDATA[<p>In our <a href="https://blog.vertexcover.io/fine-tuning-235b-moe-four-gpus" target="_blank" rel="noopener noreferrer" class="">last post</a> we fine-tuned a 235B model on four GPUs, then never shipped it, because a newer open model was accurate enough out of the box. So this post is about the next step: serving that model in production. We thought this part was easy. Start vLLM, point traffic at it, done. It wasn't. Fine-tuning is a cost you pay once; serving is a cost you pay every week, and getting it right had its own set of problems. This is what we hit, what we learned, and how we ended up handing the work to an agent.</p>
+<p>The task is the same kind as before: read a long, structured document from a customer, find the relevant entities, label each one. Prompts average about 6,500 tokens, and the model reasons before it answers, so outputs are long too. We had one machine with 8× H100 80 GB and served everything with vLLM.</p>
+<p>We ended up on Qwen3.6 27B in FP8. It takes about 15× less memory than the 397B we started with<sup><a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#user-content-fn-1-b694b0" id="user-content-fnref-1-b694b0" data-footnote-ref="true" aria-describedby="footnote-label" class="anchorTargetStickyNavbar_Vzrq">1</a></sup> and is just as accurate on this task. Changing how we deployed it got us 64% more output tokens per second on the same eight GPUs, and for the tasks we moved, running them on these GPUs costs 44% less per week than the API bill they replaced.</p>
+<p>Most of our time went into finding that setup, one run at a time: change a setting, restart vLLM, run the load test, read the metrics, keep it or revert it. Some of that time was needed. Most was not. Near the end we noticed we had been running by hand the exact loop that Karpathy's <a href="https://github.com/karpathy/autoresearch" target="_blank" rel="noopener noreferrer" class="">autoresearch</a> hands to an agent. The rest of this post is what the hand runs taught us, and why we'd still do the first few by hand.</p>
+<!-- -->
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="start-big-then-shrink">Start big, then shrink<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#start-big-then-shrink" class="hash-link" aria-label="Direct link to Start big, then shrink" title="Direct link to Start big, then shrink" translate="no">​</a></h2>
+<p>We started with the largest model that scored well and planned to step down only while accuracy held. We expected accuracy to tell us where to stop.</p>
+<p>It never did. Average F1 (the balance of precision and recall, higher is better) stayed within a point of the 397B all the way down to the 27B. What stopped the large models was throughput under load.</p>
+<table><thead><tr><th>Model</th><th>Weights</th><th>P99 at 100 concurrent</th><th>Average F1</th></tr></thead><tbody><tr><td>Qwen3.5 397B (<a href="https://blog.vertexcover.io/fine-tuning-235b-moe-four-gpus" target="_blank" rel="noopener noreferrer" class="">MoE</a>, <a href="https://docs.vllm.ai/en/latest/features/quantization/fp8.html" target="_blank" rel="noopener noreferrer" class="">FP8</a>)</td><td>~397 GB</td><td>Not usable</td><td>95.1</td></tr><tr><td>Qwen3.5 122B (MoE, <a href="https://cloud.google.com/blog/products/ai-machine-learning/bfloat16-the-secret-to-high-performance-on-cloud-tpus" target="_blank" rel="noopener noreferrer" class="">bf16</a>)</td><td>~244 GB</td><td>8–10 min</td><td>95.6</td></tr><tr><td>Qwen3.6 27B (bf16)</td><td>~54 GB</td><td>2–3 min</td><td>94.7</td></tr><tr><td>Qwen3.6 27B (FP8)</td><td>~27 GB</td><td>2–3 min</td><td>95.3</td></tr></tbody></table>
+<p>These runs are at 100 concurrent requests. At 1,000, which is closer to our production peak, even the 27B needed the changes in the next sections.</p>
+<p>These F1 scores are not comparable to the last post's. It is a similar task on a different evaluation set.<sup><a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#user-content-fn-2-b694b0" id="user-content-fnref-2-b694b0" data-footnote-ref="true" aria-describedby="footnote-label" class="anchorTargetStickyNavbar_Vzrq">2</a></sup></p>
+<p>The 9B failed, but not on accuracy. It ignored the thinking budget and kept reasoning until it ran into <code>max_tokens</code>. About 15% of its responses leaked reasoning into the answer and more hit the token limit before finishing. Roughly a quarter of its outputs couldn't be parsed, against 0.2% for the 27B. For this task, 27B was the floor.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="the-kv-cache-sets-the-ceiling">The KV cache sets the ceiling<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#the-kv-cache-sets-the-ceiling" class="hash-link" aria-label="Direct link to The KV cache sets the ceiling" title="Direct link to The KV cache sets the ceiling" translate="no">​</a></h2>
+<p>Every in-flight request holds a KV cache: the attention keys and values for every token it has seen so far, kept so they aren't recomputed for each new token. With a 6.5k-token prompt plus a few thousand reasoning tokens, each request's cache is large.</p>
+<p>The weights claim GPU memory first. The KV cache gets what's left. That leftover decides how many requests can run at once. The rest wait in a queue, and queue time is most of P99.</p>
+<p>The 397B in FP8 needs about 397 GB for weights, which leaves about 240 GB of the 640 GB before vLLM's own overhead. The 122B in bf16 left more room, but P99 under load was still 8 to 10 minutes.</p>
+<p>We did not go back and give the 122B the serving changes we later made to the 27B. Some of them might have helped it. It would still have to hold ~244 GB of weights where the 27B holds 27, and the difference is KV cache.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="what-we-watched">What we watched<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#what-we-watched" class="hash-link" aria-label="Direct link to What we watched" title="Direct link to What we watched" translate="no">​</a></h2>
+<p>vLLM exports dozens of metrics. After a few runs we only looked at four, on a Grafana dashboard:</p>
+<ul>
+<li class="">KV cache usage. When it hits 100%, vLLM can't start new requests and they pile up in the queue.</li>
+<li class="">Running vs waiting requests. If the waiting count keeps going up, the server is falling behind.</li>
+<li class="">P99 latency. The median was often fine while the slowest 1% took many minutes, and those are the ones that hit timeouts in the services calling us.</li>
+<li class="">Prefix cache hit rate. Our prompts all start with the same long instructions, so about 61% of prompt tokens were reused from earlier requests instead of being computed again.</li>
+</ul>
+<p>Every bad run looked the same: KV cache at 100%, waiting queue growing. So most of what we tried next was about giving the KV cache more memory.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="getting-the-27b-to-handle-the-load">Getting the 27B to handle the load<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#getting-the-27b-to-handle-the-load" class="hash-link" aria-label="Direct link to Getting the 27B to handle the load" title="Direct link to Getting the 27B to handle the load" translate="no">​</a></h2>
+<p>Our load test is a hand-written script that sends 1,400 requests and keeps up to 1,000 in flight at once. Every number in this section is from that test.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="baseline-dp8">Baseline: DP8<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#baseline-dp8" class="hash-link" aria-label="Direct link to Baseline: DP8" title="Direct link to Baseline: DP8" translate="no">​</a></h3>
+<p>The model fits on one GPU, so the obvious start is data parallelism (DP8): eight independent copies of the model, one per GPU, each taking its own share of requests. In bf16 the weights take 54 GB of each 80 GB GPU. KV cache sat at 100%, requests queued, and P99 was 16 minutes.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="fp8-weights">FP8 weights<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#fp8-weights" class="hash-link" aria-label="Direct link to FP8 weights" title="Direct link to FP8 weights" translate="no">​</a></h3>
+<p>FP8 stores each weight in one byte instead of two. We switched to the FP8 checkpoint (<code>Qwen/Qwen3.6-27B-FP8</code>). Weights go from ~54 GB to ~27 GB per copy, and the freed memory goes to KV cache. Accuracy didn't drop (last row of the table above).</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="tp2-dp4">TP2 DP4<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#tp2-dp4" class="hash-link" aria-label="Direct link to TP2 DP4" title="Direct link to TP2 DP4" translate="no">​</a></h3>
+<p>Each data-parallel copy holds the full weights, so eight FP8 copies is 216 GB of identical weights. Tensor parallelism of 2 (<code>--tensor-parallel-size 2</code>) splits each copy's weight matrices across a pair of GPUs. Four such copies (<code>--data-parallel-size 4</code>) cover all eight GPUs. The weights take 108 GB in total, and the rest, roughly 530 GB before vLLM's overhead, is available for KV cache.</p>
+<h3 class="anchor anchorTargetStickyNavbar_Vzrq" id="fp8-kv-cache-and-flashinfer">FP8 KV cache and FlashInfer<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#fp8-kv-cache-and-flashinfer" class="hash-link" aria-label="Direct link to FP8 KV cache and FlashInfer" title="Direct link to FP8 KV cache and FlashInfer" translate="no">​</a></h3>
+<p>Storing the KV cache itself in FP8 (<code>--kv-cache-dtype fp8</code>) halves its size, so roughly twice as many requests fit in the same memory. In the same step we switched the attention backend from vLLM's default on H100, FlashAttention 3, to FlashInfer (<code>VLLM_ATTENTION_BACKEND=FLASHINFER</code>).</p>
+<p>We measured the baseline and the final config. We did not measure each step on its own, so we can't say how much each one contributed. What we can show is where the memory went:</p>
+<table><thead><tr><th>Config</th><th>Weights per GPU</th><th>Left for KV per GPU (before overhead)</th></tr></thead><tbody><tr><td>bf16, DP8</td><td>54 GB</td><td>~26 GB</td></tr><tr><td>FP8, DP8</td><td>27 GB</td><td>~53 GB</td></tr><tr><td>FP8, TP2 DP4</td><td>13.5 GB</td><td>~66 GB</td></tr><tr><td>+ FP8 KV cache</td><td>13.5 GB</td><td>~66 GB, holding ~2× the requests</td></tr></tbody></table>
+<p>And what it bought:</p>
+<table><thead><tr><th></th><th>bf16, DP8</th><th>FP8 weights + FP8 KV + FlashInfer, TP2 DP4</th><th>Change</th></tr></thead><tbody><tr><td>Output tokens/s</td><td>9,642</td><td>15,834</td><td>+64%</td></tr><tr><td>P99 latency</td><td>16.0 min</td><td>8.0 min</td><td>−50%</td></tr><tr><td>Time for 1,400 requests</td><td>10.4 min</td><td>6.4 min</td><td>−39%</td></tr><tr><td>KV cache usage</td><td>100%</td><td>80%</td><td>20% headroom</td></tr></tbody></table>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="what-didnt-help">What didn't help<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#what-didnt-help" class="hash-link" aria-label="Direct link to What didn't help" title="Direct link to What didn't help" translate="no">​</a></h2>
+<p>Before the 1,000-concurrent runs, we tested settings one at a time on a smaller setup: four GPUs (TP2 DP2, FP8 weights), 400 requests at 100 concurrent. Baseline P99 there was 2.03 min.</p>
+<p>Two terms for the table. Prefill is the pass over the prompt. Decode is generating the answer one token at a time.</p>
+<table><thead><tr><th>Setting</th><th>Why we tried it</th><th>P99</th><th>Result</th></tr></thead><tbody><tr><td><code>--enable-chunked-prefill</code></td><td>Long prompts might block decode for other requests</td><td>2.01 min</td><td>Within noise</td></tr><tr><td><code>--gpu-memory-utilization 0.95</code></td><td>More memory for KV cache</td><td>2.05 min</td><td>Within noise</td></tr><tr><td><code>VLLM_USE_FASTOKENS=1</code></td><td>Faster tokenization</td><td>2.07 min</td><td>Within noise</td></tr><tr><td><code>--no-scheduler-reserve-full-isl</code></td><td>Don't reserve KV cache for the full prompt up front, so more requests get in</td><td>2.02 min</td><td>Within noise</td></tr></tbody></table>
+<p>None of these change how much memory the KV cache gets, and at 100 concurrent we weren't short of it yet. Chunked prefill splits a long prompt so it doesn't stall other requests' decoding, but with 61% of prompt tokens served from the prefix cache, the uncached part was short and stalled nothing. Extra memory didn't help because there was spare cache. The faster tokenizer didn't matter because the bottleneck was decoding on the GPU, not work on the CPU.</p>
+<p>We also tried different values of <code>--max-num-seqs</code>, the cap on how many requests vLLM runs in one batch. It made no difference on the 27B, because KV memory ran out well before the cap. On the bigger models, setting it too high made things worse: more requests got in than the cache could hold, and vLLM had to evict some and recompute them later. Size it to the memory you have instead of setting it as high as it goes.</p>
+<p>The caveat: at 100 concurrent there was spare cache, so memory changes did nothing. At 1,000 concurrent the baseline was out of cache, and most of what helped was about freeing memory for it. We didn't repeat these four tests at 1,000, and they might behave differently there.</p>
+<h2 class="anchor anchorTargetStickyNavbar_Vzrq" id="handing-the-loop-to-an-agent">Handing the loop to an agent<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#handing-the-loop-to-an-agent" class="hash-link" aria-label="Direct link to Handing the loop to an agent" title="Direct link to Handing the loop to an agent" translate="no">​</a></h2>
+<p>Every row in every table above came from the same loop. One run at high load takes 6 to 10 minutes plus a restart, and we sat through each one. The knobs we had to choose between:</p>
+<ul>
+<li class="">model size</li>
+<li class="">weight precision</li>
+<li class="">KV cache precision</li>
+<li class="">how the eight GPUs split between tensor and data parallelism</li>
+<li class="">attention backend</li>
+<li class="">scheduler flags</li>
+<li class="">the load you test at, which changes the answer to all of the above</li>
+</ul>
+<p>The combinations multiply, and by hand we covered a small corner of them. This is the problem Karpathy's <a href="https://github.com/karpathy/autoresearch" target="_blank" rel="noopener noreferrer" class="">autoresearch</a> solves for training: give an agent a change to make, a run to wait on, numbers to read, and a rule for keeping or reverting. Serving has the same shape. So late in the project we built one for vLLM. The agent got:</p>
+<ul>
+<li class="">the load test script, fixed at the load we expect in production</li>
+<li class="">read access to our Grafana dashboards, so it could read the four metrics after each run</li>
+<li class="">the list of experiments we still wanted to run</li>
+<li class="">a results file it had to write after every run: what it changed, what the metrics said, keep or revert</li>
+</ul>
+<p>Then it ran the loop on its own: pick an experiment, change the config, restart vLLM, run the load, read the dashboards, record, next. Runs that would have taken our attention for days ran without us, and the results file is the log we wish we had kept from day one.</p>
+<p>We could only set this up because of the hand runs. They told us which four metrics to put on the dashboard, that KV cache memory was the thing to free, and what to optimize for: tokens per second, with P99 under a limit and accuracy held. Without that we would have had nothing to tell the agent, and it would have spent GPU hours on flags that didn't matter.</p>
+<p>Most of what we learned isn't specific to this task. How vLLM uses memory, what the metrics mean, how a thinking model behaves when it runs out of budget: that will be the same next time. What changes with each task is the data, the load, and which config holds up under it. That part is a search, and the agent is better at it than we are.</p>
+<p>Next task, we'll do a handful of runs by hand to learn what's new about it, then hand the search to the agent from the start, with the model as one more knob. We'd also give it two things it didn't have this time: an accuracy and parse check in the loop, so it can't win by trading away correctness, and one written objective, so it isn't guessing what we want. That is the part we should have done first. The 64% was always going to come from the search. We just didn't have to be the ones running it.</p>
+<!-- -->
+<section data-footnotes="true" class="footnotes"><h2 class="anchor anchorTargetStickyNavbar_Vzrq sr-only" id="footnote-label">Footnotes<a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#footnote-label" class="hash-link" aria-label="Direct link to Footnotes" title="Direct link to Footnotes" translate="no">​</a></h2>
+<ol>
+<li class="anchorTargetStickyNavbar_Vzrq" id="user-content-fn-1-b694b0">
+<p>Smaller in memory, not in work per token. The 397B is a mixture-of-experts model that uses about 17B of its parameters for each token. The 27B is dense and uses all 27B. So the 27B does more compute per token while holding 15× less in GPU memory. <a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#user-content-fnref-1-b694b0" data-footnote-backref="" aria-label="Back to reference 1" class="data-footnote-backref">↩</a></p>
+</li>
+<li class="anchorTargetStickyNavbar_Vzrq" id="user-content-fn-2-b694b0">
+<p>The last post scored entity classification per tenant on one set of customer documents. This post is a similar extraction-and-labeling task on a different set of documents with its own labels, so the scores sit on different scales. Compare models within each post, not across them. <a href="https://blog.vertexcover.io/vllm-tuning-by-hand-autoresearch#user-content-fnref-2-b694b0" data-footnote-backref="" aria-label="Back to reference 2" class="data-footnote-backref">↩</a></p>
+</li>
+</ol>
+</section>]]></content>
+        <author>
+            <name>Savitha Suresh</name>
+            <uri>https://github.com/savitha-suresh</uri>
+        </author>
+        <category label="AI" term="AI"/>
+        <category label="Infrastructure" term="Infrastructure"/>
+        <category label="Performance" term="Performance"/>
+    </entry>
     <entry>
         <title type="html"><![CDATA[We fine-tuned a 235B model on four GPUs. Then we didn't need it.]]></title>
         <id>https://blog.vertexcover.io/fine-tuning-235b-moe-four-gpus</id>
